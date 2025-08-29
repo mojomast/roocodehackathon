@@ -121,6 +121,7 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
   app-network:

@@ -28,19 +28,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col lg:flex-row`}>
         {/* Sidebar Navigation */}
-        <nav className="w-64 bg-gray-800 text-white p-4 min-h-screen">
-          <h2 className="text-2xl font-bold mb-6">FixMyDocs</h2>
-          <ul>
-            <li className="mb-2">
-              <a href="/dashboard" className="block hover:text-blue-300">Dashboard</a>
+        <nav className="w-full lg:w-64 bg-gray-800 text-white p-4 min-h-screen lg:min-h-screen flex-shrink-0" role="navigation" aria-label="Main navigation">
+          <header className="mb-6">
+            <h1 className="text-2xl font-bold">FixMyDocs</h1>
+          </header>
+          <ul className="space-y-2" role="menubar">
+            <li role="none">
+              <a href="/dashboard" className="block hover:text-blue-300 focus:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 px-3 py-2 rounded" role="menuitem">
+                Dashboard
+              </a>
             </li>
-            <li className="mb-2">
-              <a href="/repos" className="block hover:text-blue-300">Repositories</a>
+            <li role="none">
+              <a href="/repos" className="block hover:text-blue-300 focus:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 px-3 py-2 rounded" role="menuitem">
+                Repositories
+              </a>
             </li>
-            <li className="mb-2">
-              <a href="/jobs" className="block hover:text-blue-300">Jobs</a>
+            <li role="none">
+              <a href="/jobs" className="block hover:text-blue-300 focus:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 px-3 py-2 rounded" role="menuitem">
+                Jobs
+              </a>
             </li>
           </ul>
         </nav>

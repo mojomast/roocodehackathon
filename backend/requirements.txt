@@ -1,7 +1,8 @@
-fastapi
-uvicorn
-sqlalchemy
-python-dotenv
-psycopg2-binary
-pytest
-httpx
+# BE-011: Version pins added to prevent production compatibility issues
+fastapi>=0.104.0,<1.0.0
+uvicorn>=0.24.0,<1.0.0
+sqlalchemy>=1.4.0,<3.0.0
+python-dotenv>=0.19.0,<2.0.0
+psycopg2-binary>=2.9.0,<3.0.0
+pytest>=7.0.0,<9.0.0
+httpx>=0.23.0,<1.0.0

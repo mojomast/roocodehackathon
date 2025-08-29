@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Lifespan
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
 from typing import Dict, Annotated
 from pydantic import BaseModel # Import BaseModel
@@ -136,17 +137,22 @@ async def github_callback(code: str, db: Session = Depends(get_db)): # This rout
     if not github_id or not username:
         raise HTTPException(status_code=500, detail="Could not retrieve essential user data from GitHub.")
 
-    # Find or create user in database
-    user = db.query(User).filter(User.github_id == github_id).first()
-    if not user:
-        user = User(github_id=github_id, username=username, access_token=access_token, email=email)
-        db.add(user)
-    else:
-        user.username = username
-        user.access_token = access_token
-        user.email = email
-    db.commit()
-    db.refresh(user)
+    # BE-012: Wrap user database operations in try-except for transaction rollback on failure
+    try:
+        # Find or create user in database
+        user = db.query(User).filter(User.github_id == github_id).first()
+        if not user:
+            user = User(github_id=github_id, username=username, access_token=access_token, email=email)
+            db.add(user)
+        else:
+            user.username = username
+            user.access_token = access_token
+            user.email = email
+        db.commit()
+        db.refresh(user)
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error during user creation/update: {str(e)}")
 
     # Redirect to frontend dashboard
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)

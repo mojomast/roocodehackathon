@@ -8,7 +8,9 @@ WORKDIR /app/frontend
 COPY ./frontend/package*.json ./
 
 # Install Node.js dependencies (production only)
-RUN npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm \
+    --mount=type=cache,target=/app/frontend/.npm \
+    npm ci --omit=dev
 
 # Copy the rest of the frontend code into the container
 COPY ./frontend .

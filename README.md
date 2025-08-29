@@ -64,6 +64,19 @@ The application is designed with a microservices architecture, containerized wit
 
 For detailed API documentation including Python examples for the worker agent integration, see [Agent API Reference](docs/agentapi.md).
 
+## 📚 Documentation
+
+This project maintains comprehensive documentation for all components:
+
+| File | Purpose | Audience |
+|------|---------|----------|
+| [`docs/API.md`](docs/API.md) | Complete REST API reference with endpoints, examples, and authentication | Backend/frontend developers, API consumers |
+| [`docs/agentapi.md`](docs/agentapi.md) | Python worker integration guide with code examples | Python developers, worker integrators |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Development setup, testing, and contribution guidelines | All contributors |
+| [`docs/DEVLOG.md`](docs/DEVLOG.md) | Project development milestones and feature implementations | Team members, stakeholders |
+
+For questions about specific documentation files, refer to their contents or check the [Contributing Guide](docs/CONTRIBUTING.md) for development setup and testing information.
+
 ### 3. Worker (Python AI Agent)
 -   **Framework**: Celery for background task processing.
 -   **Location**: `/worker`

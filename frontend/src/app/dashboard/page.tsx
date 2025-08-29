@@ -87,8 +87,10 @@ const DashboardPageContent: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">Welcome to the Dashboard!</h1>
+    <main className="min-h-screen bg-gray-100 p-8" role="main">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">Welcome to the Dashboard!</h1>
+      </header>
 
       {/* Gamification Elements */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -151,7 +153,7 @@ const DashboardPageContent: React.FC = () => {
           <p className="text-gray-600">No recent screenshots to display.</p>
         )}
       </div>
-    </div>
+    </main>
   );
 };
 

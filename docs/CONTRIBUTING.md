@@ -79,7 +79,13 @@ For development work requiring local installations:
 **Prerequisites:**
 - Docker and Docker Compose
 - Node.js (v18+) for frontend development
-- Python 3.8+ for backend development
+- Python 3.8+ for backend and worker development
+- npm or yarn package manager
+
+**Environment Requirements:**
+- PostgreSQL 10.0+
+- Redis 5.0+
+- Git (for repository operations)
 
 **Frontend Setup:**
 ```bash
@@ -88,13 +94,21 @@ npm install
 npm run dev
 ```
 
-**Backend Setup:**
+**Build Configurations:**
+- **ESLint**: Dual configuration with `.eslintrc.json` and `eslint.config.mjs` (flat config)
+- **Prettier**: Configured in `.prettierrc` with single quotes, 2-space indentation
+- **TypeScript**: Strict mode enabled via `tsconfig.json`
+- **Jest**: Configured in `jest.config.js` with jsdom environment and path aliases
+
+**Python Requirements:**
+- **Python Version**: 3.8+ (validated via requirements.txt)
+- **Backend Setup**:
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8000
 ```
 
 **Worker Setup:**
@@ -103,7 +117,30 @@ cd worker
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+# Dependencies include:
+# - celery>=5.2.0,<6.0.0 (task queue)
+# - GitPython>=3.1.0,<4.0.0 (Git operations)
+# - PyGitHub>=1.54.0,<2.0.0 (GitHub API)
+# - cryptography>=3.4.0,<42.0.0 (security)
 python worker.py
+```
+
+**Enhanced Build Commands:**
+```bash
+# Frontend linting and formatting
+cd frontend
+npm run lint    # ESLint with TypeScript rules
+npm run format  # Prettier auto-formatting
+npm run build   # Next.js production build
+
+# Backend testing and quality
+cd backend
+python -m flake8 .  # Code style checking
+python -m pytest tests/ -v --cov=. --cov-report=html
+
+# Worker testing
+cd worker
+python -m pytest tests/ -v --cov=. --cov-report=html
 ```
 
 ## Contribution Guidelines
@@ -199,18 +236,20 @@ Comprehensive testing is crucial for maintaining code quality. This section outl
 
 ### Technology Stack
 
--   **Worker**: Celery with Redis broker
--   **Database**: PostgreSQL with SQLAlchemy ORM
--   **Backend/Worker Testing**: Pytest with coverage reporting
--   **Frontend Testing**: Jest/React Testing Library with jsdom
--   **E2E Testing**: Pytest-based integration tests
--   **CI/CD**: GitHub Actions with automated linting and testing
+-   **Worker**: Celery with Redis broker for asynchronous task processing
+-   **Database**: PostgreSQL with SQLAlchemy ORM for data persistence
+-   **Backend/Worker Testing**: Pytest with coverage reporting and HTML outputs
+-   **Frontend Testing**: Jest/React Testing Library with jsdom environment, integrated with Next.js
+-   **E2E Testing**: Docker-based integration tests for full pipeline validation
+-   **CI/CD**: GitHub Actions with automated linting, testing, and deployment
+-   **Code Quality**: ESLint with TypeScript support, Prettier for consistent formatting
 
 ### Current Testing Structure
 
--   **Unit Tests**: Individual component/function testing
--   **Integration Tests**: Service-to-service communication testing
--   **End-to-End Tests**: Full user workflow testing
+-   **Unit Tests**: Individual component/function testing with isolated dependencies
+-   **Integration Tests**: Service-to-service communication testing with actual databases
+-   **End-to-End Tests**: Full user workflow testing from frontend to backend to worker
+-   **Frontend Mocking**: MSW (Mock Service Worker) for API endpoint simulation
 
 ### Running Tests
 
@@ -222,24 +261,29 @@ docker-compose -f docker-compose.yml -f docker-compose.test.yml up --build --abo
 
 # Or run tests locally (requires local setup)
 
-# Frontend tests
+# Frontend tests - Next.js integrated Jest with jsdom
 cd frontend
-npm run lint  # ESLint checking
-npm test -- --watchAll=false --coverage  # Jest tests with coverage
+npm run lint                         # ESLint checking with TypeScript rules
+npm test -- --watchAll=false --coverage  # Jest tests with coverage reporting
+npm test -- --testPathPattern=ErrorBoundary.test.js  # Specific component test
+npm test -- --testPathPattern=dashboard.test.js    # Page integration tests
 
-# Backend tests
+# Backend tests - Pytest with coverage
 cd backend
-python -m pytest tests/ -v --cov=. --cov-report=html
-python -m pytest tests/test_main.py -v
+python -m pytest tests/ -v --cov=. --cov-report=html  # All backend tests with HTML coverage
+python -m pytest test_main.py -v                    # Main API endpoint tests
+python -m pytest test_e2e.py -v                     # End-to-end integration tests
 
-# Worker tests
+# Worker tests - Python testing focused on AI worker logic
 cd worker
-python -m pytest tests/ -v --cov=. --cov-report=html
-python -m pytest test_worker.py -v
+python -m pytest tests/ -v --cov=. --cov-report=html  # Comprehensive worker testing
+python -m pytest test_worker.py -v                   # Worker task execution tests
 
-# E2E tests (integration tests)
-docker-compose up -d  # Start services first
-cd backend && python -m pytest test_e2e.py -v
+# Test Coverage Reports
+# View HTML coverage reports in your browser after running tests:
+# - backend/htmlcov/index.html (Backend coverage)
+# - worker/htmlcov/index.html (Worker coverage)
+# - Frontend coverage available in terminal output
 ```
 
 ### Test Coverage
@@ -329,6 +373,17 @@ def process_document(document_id: str, options: ProcessOptions) -> DocumentResul
 // Calculate document complexity score based on multiple factors
 const complexityScore = calculateComplexity(textMetrics, structureAnalysis);
 ```
+
+### Configuration File Standards
+
+All build and configuration files follow project standards:
+
+- **`.eslintrc.json`**: Primary ESLint rules for code quality and consistency
+- **`eslint.config.mjs`**: Flat config format for advanced ESLint features
+- **`.prettierrc`**: Code formatting rules (single quotes, 2-space indentation, etc.)
+- **`jest.config.js`**: Next.js-integrated testing configuration with jsdom environment
+- **`tsconfig.json`**: TypeScript compiler options with strict type checking
+- **`requirements.txt`**: Python dependencies with pinned versions for security
 
 ### README and Documentation Updates
 

@@ -6,10 +6,14 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --ext .js,.jsx,.ts,.tsx --fix",
+    "lint:check": "eslint --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write '**/*.{ts,tsx,js,jsx,json,md}'",
+    "format:check": "prettier --check '**/*.{ts,tsx,js,jsx,json,md}'",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "dompurify": "^3.2.6",

@@ -98,49 +98,59 @@ async def connect_repository(repo_url: str, access_token: str) -> Dict[str, str]
 ## 3. Job Management
 
 ### Create Documentation Job
-**Endpoint:** `POST /api/docs/run`  
-**Purpose:** Initiate a new documentation generation job  
+**Endpoint:** `POST /api/jobs`
+**Purpose:** Initiate a new documentation generation job
 
 ```python
-async def create_documentation_job(repo_id: int, access_token: str) -> Dict[str, str]:
+async def create_documentation_job(repo_id: int, access_token: str, job_type: str = "docstring_generation") -> Dict[str, str]:
     """
     Start a documentation generation job for a repository
-    
+
     Args:
         repo_id (int): Repository ID from connect_repository response
         access_token (str): User's GitHub access token
-        
+        job_type (str): Type of job ("docstring_generation", "readme_update", "inline_comments")
+
     Returns:
         Dict[str, str]: Job details including job ID
     """
     headers = {"Authorization": f"Bearer {access_token}"}
-    
+
     data = {
-        "repo_id": repo_id
+        "repository_id": repo_id,
+        "job_type": job_type,
+        "options": {
+            "target_files": ["*.py", "*.js"],
+            "documentation_style": "google"
+        }
     }
-    
-    response = await client.post("api/docs/run", json=data, headers=headers)
+
+    response = await client.post("api/jobs", json=data, headers=headers)
     return response.json()
 ```
 
-**Request Payload:**  
+**Request Payload:**
 ```json
 {
-  "repo_id": 123
+  "repository_id": 123,
+  "job_type": "docstring_generation",
+  "options": {
+    "target_files": ["*.py", "*.js"],
+    "documentation_style": "google"
+  }
 }
 ```
 
-**Response:**  
+**Response:**
 ```json
 {
-  "job_id": "456",
-  "status": "queued",
+  "id": 456,
+  "repository_id": 123,
+  "status": "pending",
+  "job_type": "docstring_generation",
   "created_at": "2025-08-29T20:08:44.826Z",
-  "repository": {
-    "id": 123,
-    "name": "repository",
-    "owner": "username"
-  }
+  "started_at": null,
+  "completed_at": null
 }
 ```
 
@@ -275,7 +285,7 @@ class FixMyDocsWorker:
         if not job_details:
             return {"error": "Failed to create job"}
         
-        job_id = job_details["job_id"]
+        job_id = job_details["id"]
         
         # Monitor progress
         while True:

@@ -119,8 +119,10 @@ const ReposPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">Connect your GitHub Repositories</h1>
+    <main className="min-h-screen bg-gray-100 p-8" role="main">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">Connect your GitHub Repositories</h1>
+      </header>
       <div className="bg-white p-8 rounded-lg shadow-md mb-8">
         <h2 className="text-2xl font-semibold mb-4 text-gray-700">Connect New Repository</h2>
         <form onSubmit={handleConnectRepo} className="space-y-4">
@@ -201,7 +203,7 @@ const ReposPage: React.FC = () => {
           )
         )}
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -16,6 +16,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Run Docker build and lint
+        run: |
+          docker build -f infra/backend.Dockerfile -t backend-test .
+          docker build -f infra/worker.Dockerfile -t worker-test .
       - name: Install flake8
         run: pip install flake8
       - name: Run flake8 on backend and worker
@@ -26,10 +30,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Cache frontend dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
       - name: Install frontend dependencies and run lint
         run: |
           cd frontend
-          npm install
+          npm ci
           npm run lint
 
   test:
@@ -42,6 +53,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-python-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-python-
+      - name: Install flake8
+        run: pip install flake8
       - name: Install backend and worker dependencies
         run: |
           pip install -r backend/requirements.txt
@@ -65,7 +85,7 @@ jobs:
       - name: Install frontend dependencies and run tests
         run: |
           cd frontend
-          npm install
+          npm ci
           npm test -- --coverage --watchAll=false
       - name: Upload coverage to Codecov (Frontend)
         uses: codecov/codecov-action@v3
