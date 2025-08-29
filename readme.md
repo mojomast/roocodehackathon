@@ -1,188 +1,171 @@
-🎮 Hackathon Project – Modular Gaming & Social Platform
+# Game Site Monorepo
+
+This monorepo contains the backend API, frontend application, and shared game modules for the Game Site platform.
+
+## Table of Contents
+- [Setup Instructions](#setup-instructions)
+  - [Backend Setup](#backend-setup)
+  - [Frontend Setup](#frontend-setup)
+- [API Overview](#api-overview)
+- [Adding New Games](#adding-new-games)
+
+## Setup Instructions
+
+### Backend Setup
+
+The backend is a NestJS application.
+
+1.  **Navigate to the backend directory:**
+    ```bash
+    cd backend
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Run the application:**
+    -   **Development mode:**
+        ```bash
+        npm run start:dev
+        ```
+    -   **Production mode:**
+        ```bash
+        npm run start:prod
+        ```
+    -   **Without watch mode:**
+        ```bash
+        npm run start
+        ```
+4.  **Run tests (optional):**
+    -   **Unit tests:**
+        ```bash
+        npm run test
+        ```
+    -   **E2E tests:**
+        ```bash
+        npm run test:e2e
+        ```
+    -   **Test coverage:**
+        ```bash
+        npm run test:cov
+        ```
+
+### Frontend Setup
+
+The frontend is a Next.js application.
+
+1.  **Navigate to the frontend directory:**
+    ```bash
+    cd frontend
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## API Overview
+
+The backend API is built with NestJS and provides various endpoints for authentication, chat, games, leaderboards, notifications, user progress, store, user management, wallet, and WebRTC.
+
+**Base URL:** `http://localhost:3000/api` (This can be configured in `games/api-hooks/game-api.ts`)
+
+Here's a summary of the main API endpoints:
+
+-   **Authentication (`/auth`)**
+    -   `POST /auth/login`: User login.
+    -   `POST /auth/register`: User registration.
+    -   `GET /auth/profile`: Get authenticated user's profile.
+
+-   **Chat (`/chat`)**
+    -   `GET /chat/rooms`: Get available chat rooms.
+    -   `GET /chat/rooms/:roomId/messages`: Get messages in a specific chat room.
+    -   `POST /chat/rooms/:roomId/messages`: Post a message to a chat room.
+
+-   **Games (`/games`)**
+    -   `GET /games`: Get all available games.
+    -   `GET /games/:id`: Get game details by ID.
+    -   `POST /games/:id/sessions`: Create a new game session.
+    -   `GET /games/:id/sessions`: Get game sessions for a specific game.
+
+-   **Leaderboards (`/leaderboards`)**
+    -   `GET /leaderboards/xp`: Get the XP leaderboard.
+
+-   **Notifications (`/notifications`)**
+    -   `GET /notifications/:userId`: Get notifications for a specific user.
+    -   `POST /notifications/:userId/send`: Send a notification to a user.
+
+-   **Progress (`/progress`)**
+    -   `GET /progress/:userId`: Get user's progress.
+    -   `POST /progress/:userId/xp`: Add XP to a user.
+    -   `GET /progress/:userId/level`: Get user's level.
 
-A modular web platform combining games, live chat, video chat, experience leveling, and virtual currency.
-Users engage by chatting, commenting, playing games, earning high scores, and inviting friends — gaining XP and leveling up.
-XP and a virtual currency system unlock cosmetics and profile privileges.
+-   **Store (`/store`)**
+    -   `GET /store/items`: Get all store items.
+    -   `GET /store/items/:id`: Get store item by ID.
+    -   `POST /store/purchase`: Purchase an item.
 
-The platform is designed to be modular, ensuring all games are developed within a common framework that integrates seamlessly with site features from the start.
+-   **Users (`/users`)**
+    -   `GET /users`: Get all users.
+    -   `GET /users/:id`: Get user by ID.
+    -   `POST /users`: Create a new user.
+    -   `PUT /users/:id`: Update user details.
+    -   `DELETE /users/:id`: Delete a user.
 
-Built during a hackathon using Roo Code and Gemini 3.5 for rapid prototyping and development.
+-   **Wallet (`/wallet`)**
+    -   `GET /wallet/:userId`: Get user's wallet balance.
+    -   `POST /wallet/:userId/deposit`: Deposit funds into user's wallet.
+    -   `POST /wallet/:userId/withdraw`: Withdraw funds from user's wallet.
 
-✨ Features
+-   **WebRTC (`/webrtc`)**
+    -   `POST /webrtc/signal`: Handle WebRTC signaling.
 
-🕹️ Games Framework
+## Adding New Games
 
-Standardized integration system for new games
+To add a new game to the platform, you will primarily interact with the `games/GameTemplate` and `games/api-hooks/game-api.ts` modules.
 
-Game sessions with dedicated chat rooms
+### `games/GameTemplate/index.ts`
 
-Leaderboards for high scores
+This file defines core interfaces and functions for integrating new games:
 
-💬 Social Features
+-   **`GameRegistrationData`**: Interface for data needed to register a new game (e.g., `gameId`, `gameName`, `description`).
+-   **`GameSessionStartData`**: Interface for data to start a game session (e.g., `gameId`, `userId`).
+-   **`GameScoreSubmissionData`**: Interface for submitting game scores and rewards (e.g., `sessionId`, `userId`, `score`, `rewards`).
+-   **`ChatRoomAttachmentData`**: Interface for attaching a chat room to a game session.
 
-Global chat, game-specific chats, and private group chats
+**Key Functions:**
 
-Video chat integration
+-   **`registerGame(data: GameRegistrationData)`**: Registers a new game with the backend. This would typically make an HTTP POST request to a `/games/register` endpoint (example provided in comments).
+-   **`startGameSession(data: GameSessionStartData)`**: Creates and starts a new game session. This would typically make an HTTP POST request to a `/sessions/start` endpoint (example provided in comments).
+-   **`submitGameScore(data: GameScoreSubmissionData)`**: Submits the score and rewards for a completed game session. This would typically make an HTTP POST request to a `/scores/submit` endpoint (example provided in comments).
+-   **`attachChatRoomToSession(data: ChatRoomAttachmentData)`**: Attaches a chat room to an active game session. This would typically make an HTTP POST request to a `/chat/attach` endpoint (example provided in comments).
 
-Commenting system
+### `games/api-hooks/game-api.ts`
 
-📈 Progression System
+This file provides a centralized mechanism for games to interact with the backend API, abstracting away direct fetch/axios calls and handling authentication.
 
-XP system for chatting, playing, commenting, inviting friends
+**Key Functions:**
 
-Level-up system tied to activity
+-   **`setAuthToken(token: string | null)`**: Sets the authentication token for subsequent API requests.
+-   **`register(username: string, password: string)`**: Registers a new user.
+-   **`login(username: string, password: string)`**: Logs in an existing user and obtains an authentication token.
+-   **`logout()`**: Logs out the current user by clearing the authentication token.
+-   **`startGameSession(gameId: string)`**: Initiates a new game session.
+-   **`submitGameResult(sessionId: string, score: number, otherGameData: any)`**: Submits the result of a game session.
+-   **`getUserProfile()`**: Retrieves the profile of the currently authenticated user.
+-   **`getWallet()`**: Retrieves the wallet information for the currently authenticated user.
+-   **`updateUserProfile(profileData: any)`**: Updates the user's profile information.
 
-Leaderboards for levels and XP
+**How to add a new game:**
 
-💰 Virtual Economy
-
-Virtual currency earned alongside XP
-
-Cosmetic upgrades for profiles
-
-Unlockable privileges
-
-🧩 Modular Architecture
-
-Games developed with site hooks (XP, chat, leaderboards, economy)
-
-Pluggable game modules
-
-🛠️ Tech Stack Recommendations
-
-To save time and maximize modularity:
-
-Frontend:
-
-React (with Next.js for routing & SSR)
-
-Tailwind CSS for rapid UI design
-
-Socket.IO client for real-time communication
-
-Backend:
-
-Node.js with Express or NestJS
-
-Socket.IO for live chat/game session updates
-
-PostgreSQL (with Prisma ORM) for users, XP, currency, and leaderboards
-
-Redis for session management & real-time leaderboards
-
-Video Chat:
-
-WebRTC (with PeerJS or Daily.co/Twilio SDKs for ease of integration)
-
-Hosting / DevOps:
-
-Vercel or Netlify for frontend during hackathon
-
-Railway or Supabase for backend + database hosting
-
-Docker (optional, for containerized local dev)
-
-AI Assistance:
-
-Roo Code (code orchestration & task breakdown)
-
-Gemini 3.5 (logic scaffolding & code generation)
-
-👥 Team Roles & Task Breakdown
-Frontend/UI Team
-
-Design overall UI/UX
-
-Implement React + Tailwind frontend
-
-Build modular components (chat UI, profile pages, game shells)
-
-Backend Team
-
-User authentication & management
-
-Experience, leveling, and currency systems
-
-Leaderboards & stats tracking
-
-API for games to hook into XP/currency
-
-Games Team
-
-Build games within the framework (so they integrate with XP, chat, and leaderboards)
-
-Ensure each game supports multiplayer session states
-
-Comms/Video Team
-
-Implement WebRTC for video chat
-
-Build chat room logic (global, per-game, private)
-
-Integrate chat with XP rewards
-
-Integration/Framework Team
-
-Define the APIs/hooks for games to communicate with the platform
-
-Ensure consistency across modules
-
-Maintain developer docs for team members building games
-
-🚀 Development Workflow
-
-Setup repo & CI/CD
-
-Use GitHub with branch protection & PR reviews
-
-Deploy frontend to Vercel, backend to Railway
-
-Core Framework First
-
-Authentication
-
-XP & currency system
-
-Chat system
-
-Leaderboards
-
-Parallel Work
-
-Frontend/UI team builds reusable components
-
-Games team starts with a simple game (e.g., trivia or tic-tac-toe)
-
-Video team integrates WebRTC
-
-Integration Phase
-
-Games plug into the XP/currency/chat/leaderboard framework
-
-End-to-end testing with real users
-
-📌 Hackathon Priorities
-
-Since time is limited:
-
-✅ Get core loop working (user signs up → chats/plays game → earns XP → spends currency).
-
-✅ Have at least 1 working game integrated with chat, XP, and leaderboards.
-
-✅ Make the UI clean and intuitive (focus on core features, polish later).
-
-✅ Document APIs/hooks so additional games can be added easily.
-
-🏗️ Future Enhancements
-
-Marketplace for cosmetics & profile themes
-
-More multiplayer games
-
-Friend system & invites
-
-Mobile-first responsive design
-
-Achievements & badges
-
-Would you like me to also add a sample project structure layout (folders for frontend, backend, games, shared modules, etc.) so your team has a skeleton repo ready to go?
+1.  **Define your game logic:** Create your game's core logic and UI.
+2.  **Register your game:** Use the `registerGame` function from `games/GameTemplate/index.ts` to register your game with the backend, providing its `gameId`, `gameName`, and `description`.
+3.  **Manage game sessions:**
+    -   When a user starts playing, use `startGameSession` from `games/GameTemplate/index.ts` to create a new session.
+    -   When the game ends, use `submitGameScore` from `games/GameTemplate/index.ts` to submit the score and any rewards.
+4.  **Utilize API hooks:** For any other backend interactions (e.g., user authentication, fetching user profile, managing wallet, chat), use the functions provided in `games/api-hooks/game-api.ts`. These functions handle authentication and simplify API calls.
+5.  **Integrate with chat (optional):** If your game requires in-game chat, use `attachChatRoomToSession` from `games/GameTemplate/index.ts` to link a chat room to your game session.
