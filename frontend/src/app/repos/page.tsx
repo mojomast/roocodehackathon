@@ -1,11 +1,6 @@
 // frontend/src/app/repos/page.tsx
 import React, { useState, useEffect } from 'react';
-
-interface Repo {
-  id: number;
-  repo_name: string;
-  repo_url: string;
-}
+import { apiClient, Repo, APIError } from '../../utils/apiClient';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
@@ -40,16 +35,15 @@ const ReposPage: React.FC = () => {
     setLoadingRepos(true);
     setFetchMessage('');
     try {
-      const response = await fetch('/api/repos');
-      if (response.ok) {
-        const data = await response.json();
-        setRepos(data);
-      } else {
-        setFetchMessage('Failed to fetch repositories.');
-      }
+      const data = await apiClient.getRepos();
+      setRepos(data);
     } catch (error) {
-      setFetchMessage('Error fetching repositories.');
-      console.error('Error fetching repos:', error);
+      if (error instanceof APIError) {
+        setFetchMessage(`Failed to fetch repositories: ${error.message}`);
+      } else {
+        setFetchMessage('Error fetching repositories.');
+        console.error('Error fetching repos:', error);
+      }
     } finally {
       setLoadingRepos(false);
     }
@@ -65,27 +59,18 @@ const ReposPage: React.FC = () => {
     setConnectingRepo(true);
 
     try {
-      const response = await fetch('/api/repos/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ repo_name: repoName, repo_url: repoUrl }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setConnectMessage(data.message || 'Repository connected successfully!');
-        setRepoName('');
-        setRepoUrl('');
-        fetchRepos(); // Refresh the list of repositories
-      } else {
-        setConnectMessage(data.detail || 'Failed to connect repository.');
-      }
+      const data = await apiClient.connectRepo({ repo_name: repoName, repo_url: repoUrl });
+      setConnectMessage(data.message || 'Repository connected successfully!');
+      setRepoName('');
+      setRepoUrl('');
+      fetchRepos(); // Refresh the list of repositories
     } catch (error) {
-      setConnectMessage('Error connecting repository.');
-      console.error('Error connecting repo:', error);
+      if (error instanceof APIError) {
+        setConnectMessage(`Failed to connect repository: ${error.message}`);
+      } else {
+        setConnectMessage('Error connecting repository.');
+        console.error('Error connecting repo:', error);
+      }
     } finally {
       setConnectingRepo(false);
     }
@@ -95,24 +80,15 @@ const ReposPage: React.FC = () => {
     setConnectMessage(''); // Clear previous messages
     setRunningAnalysis(repoId);
     try {
-      const response = await fetch('/api/docs/run', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ repo_id: repoId }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setConnectMessage(data.message || 'Analysis triggered successfully!');
-      } else {
-        setConnectMessage(data.detail || 'Failed to trigger analysis.');
-      }
+      const data = await apiClient.createJob({ repo_id: repoId });
+      setConnectMessage(data.message || 'Analysis triggered successfully!');
     } catch (error) {
-      setConnectMessage(`Error triggering analysis for repo ID ${repoId}.`);
-      console.error('Error triggering analysis:', error);
+      if (error instanceof APIError) {
+        setConnectMessage(`Failed to trigger analysis: ${error.message}`);
+      } else {
+        setConnectMessage(`Error triggering analysis for repo ID ${repoId}.`);
+        console.error('Error triggering analysis:', error);
+      }
     } finally {
       setRunningAnalysis(null);
     }

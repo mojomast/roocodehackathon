@@ -1,8 +1,9 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+from enum import Enum
 
 # Define the base for declarative models
 Base = declarative_base()
@@ -19,6 +20,14 @@ engine = create_engine(DATABASE_URL)
 
 # Create a SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Define Enum for Job status
+class JobStatusEnum(Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
 
 # Dependency to get the database session
 def get_db():
@@ -84,7 +93,11 @@ class Job(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     repo_id = Column(Integer, ForeignKey("repos.id"))
-    status = Column(String, default="pending") # e.g., "pending", "running", "completed", "failed"
+    status = Column(String, default=JobStatusEnum.PENDING.value) # Unified job status
+    clone_path = Column(String, nullable=True) # Path where repository is cloned for processing
+    progress = Column(Integer, default=0) # Progress percentage (0-100)
+    error_message = Column(Text, nullable=True) # Error details if job fails
+    retry_count = Column(Integer, default=0) # Number of retries attempted
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -89,6 +89,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
 - Acceptance:
   - Introduce a tiny typed API client with base URL from env (server/client aware), standardized error handling, and request/response types.
   - Pages import client; integration tests pass.
+   ✅ Completed on 2025-08-29 - Implemented typed API client with base URL handling, error management, and SSR compatibility. Replaced fetch calls in repos, jobs, and dashboard pages. Added integration tests.
 
 9) Job cancellation and idempotency
 - Problem: No cancellation endpoint; repeated triggers may duplicate work.

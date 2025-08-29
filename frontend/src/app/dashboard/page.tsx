@@ -1,6 +1,7 @@
 // frontend/src/app/dashboard/page.tsx
 import React, { useState, useEffect } from 'react';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import { apiClient, APIError } from '../../utils/apiClient';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
@@ -32,21 +33,21 @@ const DashboardPageContent: React.FC = () => {
   const [loadingScreenshots, setLoadingScreenshots] = useState(true);
   const [errorScreenshots, setErrorScreenshots] = useState<string | null>(null);
 
-  // Simulate data fetching
+  // Fetch dashboard stats
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch('/api/dashboard/stats'); // Assuming this endpoint exists
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = await apiClient.getDashboardStats();
         setTotalRepos(data.totalRepos);
-        setCompletedJobs(data.completedJobs);
+        setCompletedJobs(data.activeJobs); // Note: adjusted to match interface
       } catch (err) {
-        setError((err as Error).message);
+        if (err instanceof APIError) {
+          setError(`Failed to fetch dashboard stats: ${err.message}`);
+        } else {
+          setError((err as Error).message);
+        }
       } finally {
         setLoading(false);
       }
@@ -55,20 +56,20 @@ const DashboardPageContent: React.FC = () => {
     fetchData();
   }, []);
 
-  // FE-004: Fetch screenshots data for the component
+  // Fetch screenshots data for the component
   useEffect(() => {
     const fetchScreenshotsData = async () => {
       try {
         setLoadingScreenshots(true);
         setErrorScreenshots(null);
-        const response = await fetch('/api/screenshots'); // Assuming this endpoint exists
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const data = await apiClient.getScreenshots();
         setScreenshots(data.screenshots || []);
       } catch (err) {
-        setErrorScreenshots((err as Error).message);
+        if (err instanceof APIError) {
+          setErrorScreenshots(`Failed to fetch screenshots: ${err.message}`);
+        } else {
+          setErrorScreenshots((err as Error).message);
+        }
       } finally {
         setLoadingScreenshots(false);
       }
