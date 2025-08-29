@@ -40,23 +40,13 @@ const ReposPage: React.FC = () => {
     setLoadingRepos(true);
     setFetchMessage('');
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Simulate fetching data
-      const dummyRepos: Repo[] = [
-        { id: 1, repo_name: 'my-awesome-project', repo_url: 'https://github.com/user/my-awesome-project' },
-        { id: 2, repo_name: 'another-repo', repo_url: 'https://github.com/user/another-repo' },
-        { id: 3, repo_name: 'docs-generator', repo_url: 'https://github.com/user/docs-generator' },
-      ];
-      setRepos(dummyRepos);
-      // const response = await fetch('/api/repos');
-      // if (response.ok) {
-      //   const data = await response.json();
-      //   setRepos(data);
-      // } else {
-      //   setFetchMessage('Failed to fetch repositories.');
-      // }
+      const response = await fetch('/api/repos');
+      if (response.ok) {
+        const data = await response.json();
+        setRepos(data);
+      } else {
+        setFetchMessage('Failed to fetch repositories.');
+      }
     } catch (error) {
       setFetchMessage('Error fetching repositories.');
       console.error('Error fetching repos:', error);
@@ -75,36 +65,24 @@ const ReposPage: React.FC = () => {
     setConnectingRepo(true);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/repos/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ repo_name: repoName, repo_url: repoUrl }),
+      });
 
-      // Simulate successful connection
-      setConnectMessage('Repository connected successfully!');
-      setRepoName('');
-      setRepoUrl('');
-      fetchRepos(); // Refresh the list of repositories
+      const data = await response.json();
 
-      // Simulate an error for testing:
-      // throw new Error("Failed to connect repository.");
-
-      // const response = await fetch('/api/repos/connect', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ repo_name: repoName, repo_url: repoUrl }),
-      // });
-
-      // const data = await response.json();
-
-      // if (response.ok) {
-      //   setConnectMessage(data.message || 'Repository connected successfully!');
-      //   setRepoName('');
-      //   setRepoUrl('');
-      //   fetchRepos(); // Refresh the list of repositories
-      // } else {
-      //   setConnectMessage(data.detail || 'Failed to connect repository.');
-      // }
+      if (response.ok) {
+        setConnectMessage(data.message || 'Repository connected successfully!');
+        setRepoName('');
+        setRepoUrl('');
+        fetchRepos(); // Refresh the list of repositories
+      } else {
+        setConnectMessage(data.detail || 'Failed to connect repository.');
+      }
     } catch (error) {
       setConnectMessage('Error connecting repository.');
       console.error('Error connecting repo:', error);
@@ -117,30 +95,21 @@ const ReposPage: React.FC = () => {
     setConnectMessage(''); // Clear previous messages
     setRunningAnalysis(repoId);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await fetch('/api/docs/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ repo_id: repoId }),
+      });
 
-      // Simulate successful analysis trigger
-      setConnectMessage(`Analysis for repo ID ${repoId} triggered successfully!`);
+      const data = await response.json();
 
-      // Simulate an error for testing:
-      // throw new Error(`Failed to trigger analysis for repo ID ${repoId}.`);
-
-      // const response = await fetch('/api/docs/run', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ repo_id: repoId }),
-      // });
-
-      // const data = await response.json();
-
-      // if (response.ok) {
-      //   setConnectMessage(data.message || 'Analysis triggered successfully!');
-      // } else {
-      //   setConnectMessage(data.detail || 'Failed to trigger analysis.');
-      // }
+      if (response.ok) {
+        setConnectMessage(data.message || 'Analysis triggered successfully!');
+      } else {
+        setConnectMessage(data.detail || 'Failed to trigger analysis.');
+      }
     } catch (error) {
       setConnectMessage(`Error triggering analysis for repo ID ${repoId}.`);
       console.error('Error triggering analysis:', error);

@@ -32,16 +32,13 @@ const DashboardPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // Simulate successful data
-        setTotalRepos(12);
-        setCompletedJobs(78);
-
-        // Simulate an error for testing:
-        // throw new Error("Failed to fetch dashboard data.");
-
+        const response = await fetch('/api/dashboard/stats'); // Assuming this endpoint exists
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setTotalRepos(data.totalRepos);
+        setCompletedJobs(data.completedJobs);
       } catch (err) {
         setError((err as Error).message);
       } finally {

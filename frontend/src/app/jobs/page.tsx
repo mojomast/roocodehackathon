@@ -33,28 +33,13 @@ const JobsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Simulate fetching data
-      const dummyJobs: Job[] = [
-        { job_id: 1, repo_id: 101, status: 'completed', created_at: new Date(Date.now() - 86400000 * 2).toISOString(), updated_at: new Date(Date.now() - 86400000 * 2 + 3600000).toISOString() },
-        { job_id: 2, repo_id: 102, status: 'in_progress', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date(Date.now() - 86400000 + 1800000).toISOString() },
-        { job_id: 3, repo_id: 101, status: 'failed', created_at: new Date(Date.now() - 86400000 * 0.5).toISOString(), updated_at: new Date(Date.now() - 86400000 * 0.5 + 600000).toISOString() },
-        { job_id: 4, repo_id: 103, status: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      ];
-      setJobs(dummyJobs);
-
-      // Simulate an error for testing:
-      // throw new Error("Failed to fetch jobs data.");
-
-      // const response = await fetch('/api/jobs');
-      // if (response.ok) {
-      //   const data = await response.json();
-      //   setJobs(data);
-      // } else {
-      //   setError('Failed to fetch jobs.');
-      // }
+      const response = await fetch('/api/jobs');
+      if (response.ok) {
+        const data = await response.json();
+        setJobs(data);
+      } else {
+        setError('Failed to fetch jobs.');
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -64,28 +49,15 @@ const JobsPage: React.FC = () => {
 
   const pollJobStatus = async (jobId: number) => {
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Simulate status update
-      const updatedStatus = Math.random() > 0.7 ? 'completed' : 'in_progress'; // Randomly complete some jobs
-      setJobs((prevJobs) =>
-        prevJobs.map((job) =>
-          job.job_id === jobId
-            ? { ...job, status: updatedStatus, updated_at: new Date().toISOString() }
-            : job
-        )
-      );
-
-      // const response = await fetch(`/api/jobs/status/${jobId}`);
-      // if (response.ok) {
-      //   const data = await response.json();
-      //   setJobs((prevJobs) =>
-      //     prevJobs.map((job) => (job.job_id === jobId ? { ...job, status: data.status, updated_at: data.updated_at } : job))
-      //   );
-      // } else {
-      //   console.error(`Failed to fetch status for job ${jobId}`);
-      // }
+      const response = await fetch(`/api/jobs/status/${jobId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setJobs((prevJobs) =>
+          prevJobs.map((job) => (job.job_id === jobId ? { ...job, status: data.status, updated_at: data.updated_at } : job))
+        );
+      } else {
+        console.error(`Failed to fetch status for job ${jobId}`);
+      }
     } catch (err) {
       console.error(`Error polling job ${jobId} status:`, err);
     }

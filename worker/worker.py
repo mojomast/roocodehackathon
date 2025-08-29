@@ -6,6 +6,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
 
+from worker.job_manager import JobManager
+from worker.repo_manager import RepoManager
+from worker.parser import Parser
+from worker.ai_orchestrator import AIOrchestrator
+from worker.patcher import Patcher
+from worker.logger import Logger
+from worker.config import Config
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -27,6 +35,8 @@ class Job(Base):
     __tablename__ = 'jobs'
     id = Column(Integer, primary_key=True)
     status = Column(String, default='pending')
+    repo_url = Column(String)
+    clone_path = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -43,7 +53,7 @@ def process_documentation_job(job_id: str):
     In a real scenario, this would handle the logic for generating documentation.
     """
     logging.info(f"Processing documentation job: {job_id}")
-    
+
     db = SessionLocal()
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
@@ -51,29 +61,40 @@ def process_documentation_job(job_id: str):
             logging.error(f"Job with ID {job_id} not found.")
             return
 
-        def update_job_status(status):
-            job.status = status
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-            logging.info(f"Job {job_id} status updated to: {status}")
+        job_manager = JobManager(db, job)
+        repo_manager = RepoManager()
+        parser = Parser()
+        ai_orchestrator = AIOrchestrator()
+        patcher = Patcher()
+        app_logger = Logger()
+        config = Config() # Placeholder for future configuration
 
-        # Simulate workflow
-        update_job_status("cloning")
-        time.sleep(5)
+        # 1. Start Job
+        job_manager.start_job()
 
-        update_job_status("parsing")
-        time.sleep(5)
+        # 2. Clone Repo
+        repo_manager.clone_repo(job.repo_url, job.clone_path) # Assuming job has repo_url and clone_path
 
-        update_job_status("generating_docs")
-        time.sleep(5)
+        # 3. Parse Code
+        parser.parse_code(job.clone_path)
 
-        update_job_status("completed")
-        
+        # 4. Generate Docs
+        ai_orchestrator.generate_documentation(job.clone_path)
+
+        # 5. Create Patch/PR
+        patcher.create_patch_or_pr(job.clone_path)
+
+        # 6. Log Progress
+        app_logger.log_progress(f"Job {job_id} completed successfully.")
+
+        # 7. Complete Job
+        job_manager.complete_job()
+
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {e}")
         if db:
             db.rollback()
+        job_manager.fail_job(str(e)) # Assuming job_manager has a fail_job method
     finally:
         if db:
             db.close()

@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Dict, Annotated
 from pydantic import BaseModel # Import BaseModel
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Header, Security
+from starlette.responses import RedirectResponse
+import httpx # Import httpx for making HTTP requests
 
 from backend.models import Base, engine, get_db, User, Repo, Job
 import os
@@ -49,19 +51,80 @@ def read_root():
 @app.get("/api/auth/github")
 async def github_auth(): # This route is excluded from authentication
     """
-    Placeholder endpoint for GitHub OAuth.
-    Returns a simple success message.
+    Redirects the user to GitHub for OAuth authentication.
     """
-    return {"message": "auth successful"}
+    github_client_id = os.getenv("GITHUB_CLIENT_ID")
+    if not github_client_id:
+        raise HTTPException(status_code=500, detail="GitHub Client ID not configured.")
 
-@app.post("/auth/github/callback")
-async def github_callback(): # This route is excluded from authentication
+    github_authorize_url = "https://github.com/login/oauth/authorize"
+    redirect_uri = os.getenv("GITHUB_CALLBACK_URL", "http://localhost:8000/auth/github/callback") # Default for local development
+    scope = "user:email" # Requesting user email access
+
+    return RedirectResponse(
+        url=f"{github_authorize_url}?client_id={github_client_id}&redirect_uri={redirect_uri}&scope={scope}",
+        status_code=status.HTTP_302_FOUND
+    )
+
+@app.get("/auth/github/callback")
+async def github_callback(code: str, db: Session = Depends(get_db)): # This route is excluded from authentication
     """
-    Placeholder endpoint for GitHub OAuth callback.
-    In a real application, this would handle the OAuth exchange and user authentication.
+    Handles the GitHub OAuth callback, exchanges the code for an access token,
+    fetches user data, and creates/updates the user in the database.
     """
-    # TODO: Implement actual GitHub OAuth callback logic
-    return {"message": "GitHub OAuth callback received (placeholder)", "status": "success"}
+    github_client_id = os.getenv("GITHUB_CLIENT_ID")
+    github_client_secret = os.getenv("GITHUB_CLIENT_SECRET")
+    if not github_client_id or not github_client_secret:
+        raise HTTPException(status_code=500, detail="GitHub Client ID or Secret not configured.")
+
+    # Exchange code for access token
+    token_url = "https://github.com/login/oauth/access_token"
+    headers = {"Accept": "application/json"}
+    data = {
+        "client_id": github_client_id,
+        "client_secret": github_client_secret,
+        "code": code,
+        "redirect_uri": os.getenv("GITHUB_CALLBACK_URL", "http://localhost:8000/auth/github/callback")
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(token_url, headers=headers, json=data)
+        token_response.raise_for_status()
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Failed to obtain access token from GitHub.")
+
+    # Fetch user profile from GitHub
+    user_url = "https://api.github.com/user"
+    user_headers = {"Authorization": f"token {access_token}"}
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(user_url, headers=user_headers)
+        user_response.raise_for_status()
+        github_user_data = user_response.json()
+
+    github_id = str(github_user_data.get("id"))
+    username = github_user_data.get("login")
+    email = github_user_data.get("email") # GitHub might not always provide email directly
+
+    if not github_id or not username:
+        raise HTTPException(status_code=500, detail="Could not retrieve essential user data from GitHub.")
+
+    # Find or create user in database
+    user = db.query(User).filter(User.github_id == github_id).first()
+    if not user:
+        user = User(github_id=github_id, username=username, access_token=access_token, email=email)
+        db.add(user)
+    else:
+        user.username = username
+        user.access_token = access_token
+        user.email = email
+    db.commit()
+    db.refresh(user)
+
+    # Redirect to frontend dashboard
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
 class RepoConnectRequest(BaseModel):
     repo_url: str
