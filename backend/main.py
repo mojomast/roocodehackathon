@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Lifespan
+from fastapi import FastAPI, Depends, HTTPException, status, Lifespan, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 
 from backend.models import Base, engine, get_db, User, Repo, Job
 import os
+import hmac
+import hashlib
 
 # Lifespan event handler using asynccontextmanager
 @asynccontextmanager
@@ -237,11 +239,10 @@ async def github_app_fork_repo(repo_url: str, access_token: str) -> Dict:
     Forks a GitHub repository using the GitHub API with httpx.
     Parses the repository URL to extract owner/repo, then makes a POST request to create a fork.
     """
-    # Parse repository from URL (assumes format https://github.com/owner/repo or owner/repo)
-    parts = [p for p in repo_url.replace("$.git", "").split("/") if p][-2:]
-    if len(parts) != 2:
+    # Parse repository from URL robustly
+    owner, repo_name = parse_github_repo(repo_url)
+    if not owner or not repo_name:
         return {"status": "error", "message": "Invalid repository URL format"}
-    owner, repo_name = parts
 
     fork_url = f"https://api.github.com/repos/{owner}/{repo_name}/forks"
     headers = {
@@ -270,10 +271,9 @@ async def github_app_create_pull_request(repo_url: str, branch_name: str, commit
     Creates a PR from the specified branch to the default branch with the commit message as body.
     """
     # Parse repository
-    parts = [p for p in repo_url.replace("$.git", "").split("/") if p][-2:]
-    if len(parts) != 2:
+    owner, repo_name = parse_github_repo(repo_url)
+    if not owner or not repo_name:
         return {"status": "error", "message": "Invalid repository URL format"}
-    owner, repo_name = parts
 
     pulls_url = f"https://api.github.com/repos/{owner}/{repo_name}/pulls"
     headers = {
@@ -312,7 +312,6 @@ async def github_app_handle_webhook(payload: Dict, headers: Dict) -> Dict:
     signature = headers.get("X-Hub-Signature-256", "")
 
     print(f"Handling GitHub webhook event: {event_type}")
-    # Basic implementation - in production, verify signature with webhook secret
     if not signature:
         return {"status": "error", "message": "Missing webhook signature"}
 
@@ -326,3 +325,85 @@ async def github_app_handle_webhook(payload: Dict, headers: Dict) -> Dict:
         return {"status": "success", "message": f"Pull request {action} event handled"}
     else:
         return {"status": "success", "message": f"Unknown event {event_type} received (basic handling)"}
+
+def parse_github_repo(repo_url: str) -> tuple[str | None, str | None]:
+    """
+    Normalize and parse a GitHub repo URL into (owner, repo).
+    Supports:
+    - https://github.com/owner/repo[.git]
+    - http(s)://github.com/owner/repo/
+    - git@github.com:owner/repo[.git]
+    - owner/repo
+    """
+    try:
+        url = repo_url.strip()
+        # Remove trailing .git
+        if url.endswith('.git'):
+            url = url[:-4]
+
+        # SSH form
+        if url.startswith('git@github.com:'):
+            rest = url.split(':', 1)[1]
+            parts = rest.split('/')
+            if len(parts) >= 2:
+                return parts[0], parts[1]
+
+        # Full HTTPS URL
+        if 'github.com' in url:
+            parts = [p for p in url.split('/') if p]
+            # Find index of 'github.com'
+            if 'github.com' in parts:
+                idx = parts.index('github.com')
+                tail = parts[idx + 1:]
+            else:
+                # Might be already just owner/repo
+                tail = parts[-2:]
+            tail = [p for p in tail if p]
+            if len(tail) >= 2:
+                return tail[0], tail[1]
+
+        # owner/repo form
+        parts = [p for p in url.split('/') if p]
+        if len(parts) == 2 and all(parts):
+            return parts[0], parts[1]
+    except Exception:
+        pass
+    return None, None
+
+@app.get("/api/repos", dependencies=[Depends(verify_auth_token)])
+async def list_repositories(user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Returns repositories connected by the authenticated user.
+    """
+    repos = db.query(Repo).filter(Repo.user_id == user.id).all()
+    return [
+        {
+            "id": r.id,
+            "repo_url": r.repo_url,
+            "repo_name": r.repo_name,
+            "status": r.status,
+        }
+        for r in repos
+    ]
+
+@app.post("/api/github/webhook")
+async def github_webhook(request: Request):
+    """
+    GitHub webhook endpoint with HMAC SHA256 signature verification.
+    """
+    secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+    if not secret:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+    raw_body = await request.body()
+    sig_header = request.headers.get("X-Hub-Signature-256", "")
+    event_type = request.headers.get("X-GitHub-Event", "unknown")
+
+    mac = hmac.new(secret.encode(), msg=raw_body, digestmod=hashlib.sha256)
+    expected_sig = f"sha256={mac.hexdigest()}"
+    if not hmac.compare_digest(expected_sig, sig_header):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    payload = await request.json()
+    result = await github_app_handle_webhook(payload, dict(request.headers))
+    return result

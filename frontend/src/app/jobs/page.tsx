@@ -1,25 +1,6 @@
 // frontend/src/app/jobs/page.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-
-interface Job {
-  job_id: number;
-  repo_id: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-// Define interface for API responses to ensure consistent error and data structure
-interface JobStatusResponse {
-  status: string;
-  updated_at: string;
-}
-
-interface ApiError {
-  message: string;
-  code?: string;
-  details?: any;
-}
+import { apiClient, Job, JobStatusResponse, APIError } from '../../utils/apiClient';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
@@ -39,7 +20,7 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 const JobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [error, setError] = useState<{ message: string } | null>(null);
 
   // Debouncing for polling API calls to prevent excessive requests
   const lastPolledRef = useRef(new Map<number, number>());
@@ -52,15 +33,14 @@ const JobsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/jobs');
-      if (response.ok) {
-        const data = await response.json();
-        setJobs(data);
-      } else {
-        setError({ message: 'Failed to fetch jobs.' });
-      }
+      const data = await apiClient.getJobs();
+      setJobs(data);
     } catch (err) {
-      setError({ message: (err as Error).message });
+      if (err instanceof APIError) {
+        setError({ message: `Failed to fetch jobs: ${err.message}` });
+      } else {
+        setError({ message: (err as Error).message });
+      }
     } finally {
       setLoading(false);
     }
@@ -76,17 +56,16 @@ const JobsPage: React.FC = () => {
     lastPolledRef.current.set(jobId, now);
 
     try {
-      const response = await fetch(`/api/jobs/status/${jobId}`);
-      if (response.ok) {
-        const data: JobStatusResponse = await response.json();
-        setJobs((prevJobs) =>
-          prevJobs.map((job) => (job.job_id === jobId ? { ...job, status: data.status, updated_at: data.updated_at } : job))
-        );
-      } else {
-        console.error(`Failed to fetch status for job ${jobId}`);
-      }
+      const data = await apiClient.getJobStatus(jobId);
+      setJobs((prevJobs) =>
+        prevJobs.map((job) => (job.job_id === jobId ? { ...job, status: data.status, updated_at: data.updated_at } : job))
+      );
     } catch (err) {
-      console.error(`Error polling job ${jobId} status:`, err);
+      if (err instanceof APIError) {
+        console.error(`Failed to fetch status for job ${jobId}: ${err.message}`);
+      } else {
+        console.error(`Error polling job ${jobId} status:`, err);
+      }
     }
   };
 

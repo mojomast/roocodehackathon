@@ -79,8 +79,8 @@ class JobManager:
         try:
             self.logger.error(f"Failing job {self.job.id} with error: {error_message}")
             self.job.status = 'failed'
+            self.job.error_message = error_message
             self.job.updated_at = datetime.utcnow()
-            # TODO: Add error_message field to Job model if needed for persistence
             self.db.commit()
             return True
         except Exception as e:
@@ -101,7 +101,7 @@ class JobManager:
         try:
             if progress is not None:
                 self.logger.info(f"Job {self.job.id} progress: {progress}%")
-                # TODO: Add progress field to Job model if needed
+                self.job.progress = progress
                 self.job.updated_at = datetime.utcnow()
                 self.db.commit()
             return True
@@ -165,7 +165,7 @@ class JobManager:
             if self.job.status == 'failed':
                 self.logger.info(f"WK-010: Retrying job {self.job.id}")
                 self.job.status = 'pending'
-                # TODO: Add retry_count field to Job model if needed
+                self.job.retry_count += 1
                 self.job.updated_at = datetime.utcnow()
                 self.db.commit()
                 return True
@@ -192,8 +192,7 @@ class JobManager:
         """
         try:
             self.logger.info(f"WK-010: Updating error message for job {self.job.id}")
-            # TODO: Add error_message field to Job model for persistent storage
-            # For now, we log it
+            self.job.error_message = error_message
             self.logger.error(f"Job {self.job.id} error details: {error_message}")
             self.job.updated_at = datetime.utcnow()
             self.db.commit()
@@ -216,7 +215,7 @@ class JobManager:
             job_info = {
                 'job_id': self.job.id,
                 'status': self.job.status,
-                'repo_url': self.job.repo_url,
+                'repo_url': self.job.repository.repo_url if self.job.repository else None,
                 'clone_path': self.job.clone_path,
                 'created_at': self.job.created_at.isoformat() if self.job.created_at else None,
                 'updated_at': self.job.updated_at.isoformat() if self.job.updated_at else None
@@ -240,12 +239,14 @@ class JobManager:
                 self.logger.error("WK-010: Job ID is missing")
                 return False
 
-            if not self.job.repo_url:
+            repo_url = self.job.repository.repo_url if self.job.repository else None
+            if not repo_url:
                 self.logger.error("WK-010: Repository URL is missing")
+                return False
 
             # Validate repository URL format
             from urllib.parse import urlparse
-            parsed_url = urlparse(self.job.repo_url)
+            parsed_url = urlparse(repo_url)
             if not parsed_url.scheme or not parsed_url.netloc:
                 self.logger.error("WK-010: Invalid repository URL format")
                 return False

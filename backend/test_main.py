@@ -4,9 +4,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 import os
+import hmac
+import hashlib
 
-from backend.main import app
-from backend.models import Base, get_db
+from backend.main import app, parse_github_repo
+from backend.models import Base, get_db, User, Repo, Job
 
 # Test database configuration
 TEST_DATABASE_URL = "sqlite:///./test.db"
@@ -37,10 +39,21 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
+# Set webhook secret for tests
+os.environ["GITHUB_WEBHOOK_SECRET"] = "testsecret"
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
     """Create tables before tests and drop after."""
     Base.metadata.create_all(bind=engine)
+    # seed an auth user
+    db = TestingSessionLocal()
+    try:
+        user = User(github_id="gh_test", username="testuser", access_token="test-token", email="test@example.com")
+        db.add(user)
+        db.commit()
+    finally:
+        db.close()
     yield
     Base.metadata.drop_all(bind=engine)
 
@@ -242,29 +255,21 @@ def test_user_creation_in_github_callback(client, mocker):
     mocker.patch("httpx.AsyncClient", return_value=client_mock)
 
     # Count users before
-    from backend.models import User
-    from backend.main import SessionLocal
-
-    db = SessionLocal()
+    db = TestingSessionLocal()
     before_count = db.query(User).count()
     db.close()
 
     client.get("/auth/github/callback?code=test_code")
 
     # Count users after
-    db = SessionLocal()
+    db = TestingSessionLocal()
     after_count = db.query(User).count()
     db.close()
 
     assert after_count == before_count + 1
 
 def test_repo_association_with_user(client, auth_headers):
-    """Test repo association with dummy user."""
-    # The connect endpoint creates a dummy user internally
-
-    from backend.models import User, Repo
-    from backend.main import SessionLocal
-
+    """Test repo association with authenticated user."""
     response = client.post("/api/repos/connect", json={
         "repo_url": "https://github.com/test/repo",
         "repo_name": "test-repo"
@@ -272,9 +277,9 @@ def test_repo_association_with_user(client, auth_headers):
 
     assert response.status_code == 200
 
-    db = SessionLocal()
+    db = TestingSessionLocal()
     repo = db.query(Repo).first()
-    user = db.query(User).filter(User.username == "dummy_user").first()
+    user = db.query(User).filter(User.username == "testuser").first()
     db.close()
 
     assert repo is not None
@@ -284,7 +289,6 @@ def test_repo_association_with_user(client, auth_headers):
 def test_job_creation_and_lifecycle(client, auth_headers):
     """Test job creation and status tracking."""
     from backend.models import Job
-    from backend.main import SessionLocal
 
     # Create repo
     client.post("/api/repos/connect", json={
@@ -296,7 +300,7 @@ def test_job_creation_and_lifecycle(client, auth_headers):
     response = client.post("/api/docs/run", json={"repo_id": 1}, headers=auth_headers)
     job_id = response.json()["job_id"]
 
-    db = SessionLocal()
+    db = TestingSessionLocal()
     job = db.query(Job).filter(Job.id == job_id).first()
     db.close()
 
@@ -397,6 +401,56 @@ async def test_github_app_handle_webhook_pull_request_event():
 
     assert result["status"] == "success"
     assert "pull request" in result["message"]
+
+def test_list_repositories_endpoint(client, auth_headers):
+    """GET /api/repos returns user repositories."""
+    # connect a repo first
+    client.post("/api/repos/connect", json={"repo_url":"https://github.com/owner/repo","repo_name":"repo"}, headers=auth_headers)
+    resp = client.get("/api/repos", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert any(r["repo_name"] == "repo" for r in data)
+
+def test_parse_github_repo_variants():
+    """Repository URL parsing handles https, .git, ssh, and owner/repo."""
+    assert parse_github_repo("https://github.com/owner/repo") == ("owner","repo")
+    assert parse_github_repo("https://github.com/owner/repo.git") == ("owner","repo")
+    assert parse_github_repo("git@github.com:owner/repo.git") == ("owner","repo")
+    assert parse_github_repo("owner/repo") == ("owner","repo")
+
+def test_webhook_signature_verification_valid(client):
+    payload = {"ref": "refs/heads/main"}
+    import json
+    body = json.dumps(payload).encode()
+    secret = os.environ["GITHUB_WEBHOOK_SECRET"].encode()
+    sig = hmac.new(secret, body, hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/api/github/webhook",
+        data=body,
+        headers={
+            "X-Hub-Signature-256": f"sha256={sig}",
+            "X-GitHub-Event": "push",
+            "Content-Type": "application/json",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+
+def test_webhook_signature_verification_invalid(client):
+    import json
+    body = json.dumps({"test":"x"}).encode()
+    resp = client.post(
+        "/api/github/webhook",
+        data=body,
+        headers={
+            "X-Hub-Signature-256": "sha256=deadbeef",
+            "X-GitHub-Event": "push",
+            "Content-Type": "application/json",
+        },
+    )
+    assert resp.status_code == 401
 
 @pytest.mark.asyncio
 async def test_github_app_handle_webhook_missing_signature():

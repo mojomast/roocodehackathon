@@ -95,6 +95,15 @@ async def connect_repository(repo_url: str, access_token: str) -> Dict[str, str]
 }
 ```
 
+### List Repositories
+**Endpoint:** `GET /api/repos`
+```python
+async def list_repositories(access_token: str) -> Dict[str, list]:
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = await client.get("api/repos", headers=headers)
+    return response.json()
+```
+
 ## 3. Job Management
 
 ### Create Documentation Job
@@ -314,6 +323,7 @@ class FixMyDocsWorker:
 Required environment variables for production:
 - `BACKEND_BASE_URL`: Base URL for the FixMyDocs backend
 - `GITHUB_ACCESS_TOKEN`: GitHub access token for authenticated requests
+ - `GITHUB_WEBHOOK_SECRET`: Secret used to validate GitHub webhooks (backend)
 
 ## Notes for Development
 

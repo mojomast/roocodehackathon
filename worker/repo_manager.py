@@ -10,6 +10,7 @@ import os
 import subprocess
 from typing import Optional, Dict
 import urllib.parse
+import time
 
 # WK-013: Import GitPython for actual git operations
 try:
@@ -497,9 +498,10 @@ class RepoManager:
 
             # Check for source files
             source_files = []
-            for root, dirs, dirs[:] in os.walk(repo_path):
+            for root, dirs, files in os.walk(repo_path):
+                # skip hidden directories
                 dirs[:] = [d for d in dirs if not d.startswith('.')]
-                for file in os.listdir(root):
+                for file in files:
                     if file.endswith(('.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs')):
                         source_files.append(os.path.join(root, file))
 
