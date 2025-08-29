@@ -469,35 +469,7 @@ class Patcher:
         except Exception as e:
             raise RuntimeError(f"Error creating patch file: {e}")
 
-    # WK-012: Additional GitHub API implementations
-    def create_pull_request(self, clone_path: str, **kwargs) -> bool:
-        """
-        WK-010: Create a pull request with the documentation changes.
-
-        Stub implementation for pull request creation that will be
-        implemented with GitHub API in WK-012.
-
-        Args:
-            clone_path (str): Path to the repository with changes
-            **kwargs: Additional parameters for PR creation
-
-        Returns:
-            bool: True if PR creation was successful, False otherwise
-        """
-        try:
-            self.logger.info(f"WK-010: Creating pull request for {clone_path}")
-
-            # Stub implementation - will be replaced with actual GitHub API calls in WK-012
-            # TODO: Implement PR creation with GitHub API
-            # This would include:
-            # - Pushing the branch to remote
-            # - Creating PR with title, body, reviewers
-            # - Adding labels and assignees
-
-            self.logger.info("WK-010: Pull request creation stub completed")
-            return True
-        except Exception as e:
-            self.logger.error(f"WK-010: Error creating pull request: {e}")
+    # (duplicate stub removed: canonical create_pull_request defined above)
             return False
 
     def push_changes_to_remote(self, clone_path: str) -> bool:

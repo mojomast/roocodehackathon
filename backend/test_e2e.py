@@ -43,6 +43,14 @@ app.dependency_overrides[get_db] = override_get_db
 def setup_e2e_database():
     """Create tables before E2E tests and drop after."""
     Base.metadata.create_all(bind=engine)
+    # seed auth user for X-Auth-Token
+    db = TestingSessionLocal()
+    try:
+        from backend.models import User
+        db.add(User(github_id="gh_e2e", username="e2euser", access_token="test-e2e-token", email="e2e@example.com"))
+        db.commit()
+    finally:
+        db.close()
     yield
     Base.metadata.drop_all(bind=engine)
 

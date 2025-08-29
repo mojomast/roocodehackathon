@@ -6,7 +6,6 @@ from urllib.parse import urlparse, parse_qs
 
 # WK-009: Enhanced imports for database validation, secrets management, and security
 from cryptography.fernet import Fernet, InvalidToken
-import validators
 from celery import Celery
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
@@ -59,12 +58,7 @@ def validate_and_sanitize_database_url(db_url: Optional[str]) -> str:
 
     db_url = db_url.strip()
 
-    # Basic URL format validation
-    if not validators.url(db_url):
-        logging.error(f"WK-009: DATABASE_URL format is invalid: {db_url}")
-        raise ValueError("DATABASE_URL must be a valid URL format.")
-
-    # Parse URL for detailed validation
+    # Parse URL for detailed validation (accept SQLAlchemy URIs)
     try:
         parsed = urlparse(db_url)
     except Exception as e:
@@ -72,15 +66,15 @@ def validate_and_sanitize_database_url(db_url: Optional[str]) -> str:
         raise ValueError(f"Invalid DATABASE_URL format: {db_url}")
 
     # Validate allowed schemes
-    allowed_schemes = {'postgresql', 'mysql+pymysql', 'mysql+mysqldb', 'sqlite'}
+    allowed_schemes = {'postgresql', 'postgresql+psycopg2', 'mysql', 'mysql+pymysql', 'mysql+mysqldb', 'sqlite'}
     if parsed.scheme not in allowed_schemes:
         logging.error(f"WK-009: Invalid database scheme: {parsed.scheme}")
         raise ValueError(f"Unsupported database scheme. Allowed: {', '.join(allowed_schemes)}")
 
     # Sanitize hostname to prevent injection
     if parsed.hostname:
-        if not re.match(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', parsed.hostname):
-            logging.warning(f"WK-009: Suspicious hostname detected: {parsed.hostname}")
+        if not re.match(r'^[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})*$', parsed.hostname):
+            logging.debug(f"WK-009: Non-standard hostname detected: {parsed.hostname}")
 
     # Validate username and password if present
     if parsed.username or parsed.password:
