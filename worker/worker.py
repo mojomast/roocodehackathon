@@ -47,7 +47,7 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @app.task
-def process_documentation_job(job_id: str):
+def process_documentation_job(job_id: int):
     """
     Placeholder task for processing documentation jobs.
     In a real scenario, this would handle the logic for generating documentation.

@@ -10,6 +10,10 @@ Base = declarative_base()
 # Database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Validate DATABASE_URL - BE-001: Ensure it's not None or empty
+if not DATABASE_URL or not DATABASE_URL.strip():
+    raise ValueError("DATABASE_URL environment variable is required and cannot be empty")
+
 # Create the SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
 
@@ -31,7 +35,7 @@ def get_db():
 class User(Base):
     """
     SQLAlchemy model for a User.
-    Represents a user with GitHub authentication details.
+    Represents a user with GitHub authentication details and optional email.
     """
     __tablename__ = "users"
 
@@ -39,6 +43,7 @@ class User(Base):
     github_id = Column(String, unique=True, index=True)
     username = Column(String, unique=True, index=True)
     access_token = Column(String)
+    email = Column(String, nullable=True)  # BE-002: Added email field to User model
 
     repos = relationship("Repo", back_populates="owner")
 
