@@ -33,6 +33,8 @@ The application is designed with a microservices architecture, containerized wit
     -   `POST /api/docs/run`: Triggers a new documentation job.
     -   `GET /api/jobs/status/{id}`: Checks the status of a specific job.
 
+For detailed API documentation including Python examples for the worker agent integration, see [Agent API Reference](docs/agentapi.md).
+
 ### 3. Worker (Python AI Agent)
 -   **Framework**: Celery for background task processing.
 -   **Location**: `/worker`
