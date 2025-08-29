@@ -23,7 +23,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - Importing `repo_manager.py` in a Python REPL succeeds with no SyntaxError.
   - Unit test executes `validate_repository()` on valid/invalid URLs and returns expected booleans.
   
-  ✅ Fixed on 2025-08-29 in commit TBD.
+  ✅ Fixed on 2025-08-29 in commit a9c325f.
   - Tests added: `worker/test_repo_manager_unit.py::test_validate_repository_valid_and_invalid`.
 
 2) Patcher duplicate method definitions override logic
@@ -33,7 +33,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - Only one canonical implementation per method; no duplicate names.
   - Unit tests prove commit creation and PR creation logic is invoked and returns expected shapes (mocked network).
 
-  ✅ Fixed on 2025-08-29 in commit TBD. Removed duplicate `create_pull_request` stub in `worker/patcher.py`.
+  ✅ Fixed on 2025-08-29 in commit a9c325f. Removed duplicate `create_pull_request` stub in `worker/patcher.py`.
 
 3) Backend GitHub URL parsing bug
 - Evidence: `backend/main.py` — repository URL cleanup uses `.replace("$.git", "")` instead of `.replace(".git", "")`.
@@ -42,7 +42,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - Parsing `https://github.com/owner/repo.git` yields `owner/repo`.
   - Tests cover URLs with/without `.git` and SSH forms.
 
-  ✅ Fixed on 2025-08-29 in commit TBD. Added `parse_github_repo` helper; tests in `backend/test_main.py::test_parse_github_repo_variants`.
+  ✅ Fixed on 2025-08-29 in commit a9c325f. Added `parse_github_repo` helper; tests in `backend/test_main.py::test_parse_github_repo_variants`.
 
 4) Missing GET /api/repos endpoint used by frontend
 - Evidence: Frontend pages call `GET /api/repos`, but backend lacks this route.
@@ -51,7 +51,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - Backend exposes `GET /api/repos` returning a JSON array of user-connected repositories.
   - Frontend renders list without errors and passes an integration test.
 
-  ✅ Fixed on 2025-08-29 in commit TBD. Implemented `GET /api/repos`; tests: `backend/test_main.py::test_list_repositories_endpoint`.
+  ✅ Fixed on 2025-08-29 in commit a9c325f. Implemented `GET /api/repos`; tests: `backend/test_main.py::test_list_repositories_endpoint`.
 
 5) Worker DB URL validation rejects SQLAlchemy URIs
 - Evidence: `worker/worker.py` uses URL checks that reject dialect URIs (e.g., `sqlite:///...`).
@@ -60,7 +60,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - Worker accepts standard SQLAlchemy URLs (sqlite, postgres) and starts.
   - Negative tests still reject malformed strings.
 
-  ✅ Fixed on 2025-08-29 in commit TBD. Relaxed scheme validation in `worker/worker.py` to accept SQLAlchemy URIs.
+  ✅ Fixed on 2025-08-29 in commit a9c325f. Relaxed scheme validation in `worker/worker.py` to accept SQLAlchemy URIs.
 
 6) Webhook signature not verified
 - Evidence: `backend/main.py` GitHub webhook handler lacks HMAC signature verification.
@@ -69,7 +69,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - HMAC (X-Hub-Signature-256) verified with shared secret; invalid requests return 401.
   - Unit tests validate both valid and tampered payloads.
 
-  ✅ Fixed on 2025-08-29 in commit TBD. Implemented `/api/github/webhook` with HMAC verification; tests `backend/test_main.py::test_webhook_signature_verification_valid` and `::test_webhook_signature_verification_invalid`.
+  ✅ Fixed on 2025-08-29 in commit a9c325f. Implemented `/api/github/webhook` with HMAC verification; tests `backend/test_main.py::test_webhook_signature_verification_valid` and `::test_webhook_signature_verification_invalid`.
 
 7) Tests drifted from code
 - Evidence: Some tests import symbols no longer present and/or assume routes that changed.
@@ -78,7 +78,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
   - Test suite updated to match current public API and passes locally.
   - At least one happy-path e2e for auth→connect repo→run job→status.
 
-  ✅ Fixed on 2025-08-29 in commit TBD. Updated fixtures to seed auth user and aligned endpoints; e2e flows in `backend/test_e2e.py` use mocked worker call and pass locally.
+  ✅ Fixed on 2025-08-29 in commit a9c325f. Updated fixtures to seed auth user and aligned endpoints; e2e flows in `backend/test_e2e.py` use mocked worker call and pass locally.
 
 ---
 
@@ -173,7 +173,7 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
 ---
 
 ## Quick Wins (suggested first passes)
-1) Fix `.replace("$.git")` → `.replace(".git")` and add `GET /api/repos`. ✅ Done (2025-08-29, commit TBD).
+1) Fix `.replace("$.git")` → `.replace(".git")` and add `GET /api/repos`. ✅ Done (2025-08-29, commit a9c325f).
 2) Remove duplicate methods in `worker/patcher.py` and correct `repo_manager.py` syntax.
 3) Relax worker DB URL validation to accept SQLAlchemy URIs.
 4) Add HMAC verification to webhook handler.
@@ -189,6 +189,8 @@ Each delivers immediate stability and unblocks core flows.
 ---
 
 Milestone Report — All P0 items resolved (2025-08-29)
+
+Milestone commit: a9c325f
 
 Items completed
 - 1) Worker repo validation syntax error

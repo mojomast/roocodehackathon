@@ -1,5 +1,7 @@
 # Repository Improvement Backlog — FixMyDocs
 
+Note: This is a copy. The canonical, up-to-date backlog is maintained at the repository root in `IMPROVEMENT_BACKLOG.md`.
+
 Date: 2025-08-29
 Scope: Backend (FastAPI/Python), Worker (Celery/Python), Frontend (Next.js/TypeScript)
 Sources: Code review across `backend/`, `worker/`, `frontend/`, and docs. Items include acceptance criteria and priorities.
