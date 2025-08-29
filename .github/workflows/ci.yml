@@ -46,11 +46,18 @@ jobs:
         run: |
           pip install -r backend/requirements.txt
           pip install -r worker/requirements.txt
-          pip install pytest
-      - name: Run pytest in backend
-        run: pytest backend
-      - name: Run pytest in worker
-        run: pytest worker
+          pip install pytest pytest-cov
+      - name: Run pytest in backend with coverage
+        run: |
+          pytest backend --cov=backend --cov-report=xml --cov-report=html
+      - name: Run pytest in worker with coverage
+        run: |
+          pytest worker --cov=worker --cov-report=xml --cov-report=html
+      - name: Upload coverage to Codecov (Python)
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: python-backend
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -59,4 +66,9 @@ jobs:
         run: |
           cd frontend
           npm install
-          npm test
+          npm test -- --coverage --watchAll=false
+      - name: Upload coverage to Codecov (Frontend)
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./frontend/coverage/lcov.info
+          flags: react-frontend

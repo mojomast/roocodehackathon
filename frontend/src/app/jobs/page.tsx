@@ -1,5 +1,5 @@
 // frontend/src/app/jobs/page.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 interface Job {
   job_id: number;
@@ -7,6 +7,18 @@ interface Job {
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+// Define interface for API responses to ensure consistent error and data structure
+interface JobStatusResponse {
+  status: string;
+  updated_at: string;
+}
+
+interface ApiError {
+  message: string;
+  code?: string;
+  details?: any;
 }
 
 // Placeholder for a generic LoadingSpinner component
@@ -27,7 +39,14 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 const JobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  // Debouncing for polling API calls to prevent excessive requests
+  const lastPolledRef = useRef(new Map<number, number>());
+  const DEBOUNCE_MS = 1000; // 1 second debounce per job
+
+  // Use ref to ensure only one polling interval is active at a time, preventing memory leaks from multiple intervals
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -38,20 +57,28 @@ const JobsPage: React.FC = () => {
         const data = await response.json();
         setJobs(data);
       } else {
-        setError('Failed to fetch jobs.');
+        setError({ message: 'Failed to fetch jobs.' });
       }
     } catch (err) {
-      setError((err as Error).message);
+      setError({ message: (err as Error).message });
     } finally {
       setLoading(false);
     }
   };
 
   const pollJobStatus = async (jobId: number) => {
+    // Implement debouncing to prevent excessive API calls for the same job
+    const now = Date.now();
+    const lastPolled = lastPolledRef.current.get(jobId);
+    if (lastPolled !== undefined && now - lastPolled < DEBOUNCE_MS) {
+      return; // Skip if recently polled
+    }
+    lastPolledRef.current.set(jobId, now);
+
     try {
       const response = await fetch(`/api/jobs/status/${jobId}`);
       if (response.ok) {
-        const data = await response.json();
+        const data: JobStatusResponse = await response.json();
         setJobs((prevJobs) =>
           prevJobs.map((job) => (job.job_id === jobId ? { ...job, status: data.status, updated_at: data.updated_at } : job))
         );
@@ -63,19 +90,41 @@ const JobsPage: React.FC = () => {
     }
   };
 
+  // Fetch jobs on component mount and set up polling only when jobs are available
   useEffect(() => {
     fetchJobs();
+  }, []);
 
-    const interval = setInterval(() => {
-      jobs.forEach((job) => {
-        if (job.status !== 'completed' && job.status !== 'failed') {
-          pollJobStatus(job.job_id);
-        }
-      });
-    }, 5000); // Poll every 5 seconds
+  // Separate polling useEffect to manage interval lifecycle and prevent multiple intervals
+  useEffect(() => {
+    if (jobs.length > 0) {
+      // Start polling if not already active
+      if (!intervalRef.current) {
+        intervalRef.current = setInterval(() => {
+          // Poll only jobs that are not completed or failed to minimize unnecessary API calls
+          jobs.forEach((job) => {
+            if (job.status !== 'completed' && job.status !== 'failed') {
+              pollJobStatus(job.job_id);
+            }
+          });
+        }, 5000); // Poll every 5 seconds
+      }
+    } else {
+      // Clear polling if no jobs
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
 
-    return () => clearInterval(interval);
-  }, [jobs]); // Re-run effect when jobs change to update polling
+    // Cleanup function to clear interval on unmount or jobs change
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [jobs]); // Depend on jobs to start/stop polling based on availability
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -92,7 +141,7 @@ const JobsPage: React.FC = () => {
       <h1 className="text-3xl font-bold mb-8 text-gray-800">View your Documentation Jobs</h1>
       <div className="bg-white p-8 rounded-lg shadow-md">
         {loading && <LoadingSpinner />}
-        {error && <ErrorMessage message={error} />}
+        {error && <ErrorMessage message={error.message} />}
         {!loading && !error && (
           jobs.length === 0 ? (
             <p className="text-gray-600">No documentation jobs found.</p>

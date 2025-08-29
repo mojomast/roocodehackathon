@@ -141,6 +141,35 @@ class Config:
             'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         }
 
+    def get_ai_config(self) -> Dict[str, Any]:
+        """WK-015: Get AI/LLM configuration."""
+        return {
+            'model': self.get('ai_model'),
+            'temperature': self.get('ai_temperature'),
+            'max_tokens': self.get('ai_max_tokens')
+        }
+
+    def get_security_config(self) -> Dict[str, Any]:
+        """WK-015: Get security configuration."""
+        return {
+            'enable_auth': self.get('enable_auth'),
+            'secret_key': self.get('secret_key')
+        }
+
+    def get_performance_config(self) -> Dict[str, Any]:
+        """WK-015: Get performance configuration."""
+        return {
+            'max_concurrent_jobs': self.get('max_concurrent_jobs'),
+            'job_timeout': self.get('job_timeout')
+        }
+
+    def get_repo_config(self) -> Dict[str, Any]:
+        """WK-015: Get repository management configuration."""
+        return {
+            'temp_dir': self.get('temp_dir'),
+            'clone_timeout': self.get('clone_timeout')
+        }
+
     def reload(self) -> None:
         """Reload configuration from environment variables."""
         old_config = self._config.copy()

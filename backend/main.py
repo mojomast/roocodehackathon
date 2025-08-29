@@ -1,44 +1,57 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Lifespan
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Annotated
 from pydantic import BaseModel # Import BaseModel
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Header, Security
 from starlette.responses import RedirectResponse
 import httpx # Import httpx for making HTTP requests
+from contextlib import asynccontextmanager
 
 from backend.models import Base, engine, get_db, User, Repo, Job
 import os
+
+# Lifespan event handler using asynccontextmanager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler that runs when the FastAPI application starts up and shuts down.
+    Creates all database tables if they don't already exist during startup.
+    """
+    # Startup
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Shutdown (if needed in the future)
 
 # Initialize FastAPI application
 app = FastAPI(
     title="FixMyDocs Backend",
     description="Backend API for FixMyDocs, handling documentation generation and GitHub integration.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
-# Create database tables on startup
-@app.on_event("startup")
-def on_startup():
-    """
-    Event handler that runs when the FastAPI application starts up.
-    Creates all database tables if they don't already exist.
-    """
-    Base.metadata.create_all(bind=engine)
+# Database tables are now created via lifespan event handler above
 
 # Security dependency
 security = HTTPBearer()
 
-async def verify_auth_token(x_auth_token: Annotated[str | None, Header()] = None):
+async def verify_auth_token(x_auth_token: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
     """
-    Middleware to verify the X-Auth-Token header.
-    For now, it accepts any value. If not present, it returns 401 Unauthorized.
+    Middleware to verify the X-Auth-Token header by validating against the database.
+    Looks up the access_token in the User table. If not found, returns 401 Unauthorized.
+    Returns the authenticated User object on success.
     """
     if x_auth_token is None:
         raise HTTPException(status_code=401, detail="Unauthorized: X-Auth-Token header missing")
-    # In a real application, you would validate the token here (e.g., against a database, JWT verification)
-    return x_auth_token
+
+    # Validate token against database
+    user = db.query(User).filter(User.access_token == x_auth_token).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid access token")
+
+    return user
 
 @app.get("/")
 def read_root():
@@ -106,8 +119,20 @@ async def github_callback(code: str, db: Session = Depends(get_db)): # This rout
 
     github_id = str(github_user_data.get("id"))
     username = github_user_data.get("login")
-    email = github_user_data.get("email") # GitHub might not always provide email directly
+    # Handle GitHub email - may be None, so fetch if necessary
+    email = github_user_data.get("email")
+    if not email:
+        # Fetch user emails if primary email not provided
+        emails_url = "https://api.github.com/user/emails"
+        async with httpx.AsyncClient() as client:
+            emails_response = await client.get(emails_url, headers=user_headers)
+            emails_response.raise_for_status()
+            emails = emails_response.json()
+            # Find primary email or use first available
+            primary_email = next((e["email"] for e in emails if e.get("primary")), None)
+            email = primary_email or (emails[0]["email"] if emails else None)
 
+    # Check if essential data is available (email can be optional)
     if not github_id or not username:
         raise HTTPException(status_code=500, detail="Could not retrieve essential user data from GitHub.")
 
@@ -130,22 +155,14 @@ class RepoConnectRequest(BaseModel):
     repo_url: str
     repo_name: str # Assuming repo_name is also part of the details
 
-@app.post("/api/repos/connect", dependencies=[Depends(verify_auth_token)])
-async def connect_repository(request: RepoConnectRequest, db: Session = Depends(get_db)):
+@app.post("/api/repos/connect")
+async def connect_repository(request: RepoConnectRequest, user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
     """
     Connects a new repository to the system.
     Accepts repository URL and name, creates a Repo record, and returns its ID.
+    Uses the authenticated user for association instead of dummy user.
     """
-    # For now, let's create a dummy user if they don't exist
-    # TODO: Replace with actual user authentication and association
-    dummy_user = db.query(User).filter(User.username == "dummy_user").first()
-    if not dummy_user:
-        dummy_user = User(github_id="dummy_github_id", username="dummy_user", access_token="dummy_token")
-        db.add(dummy_user)
-        db.commit()
-        db.refresh(dummy_user)
-
-    new_repo = Repo(user_id=dummy_user.id, repo_url=request.repo_url, repo_name=request.repo_name, status="connected")
+    new_repo = Repo(user_id=user.id, repo_url=request.repo_url, repo_name=request.repo_name, status="connected")
     db.add(new_repo)
     db.commit()
     db.refresh(new_repo)
@@ -174,7 +191,7 @@ async def trigger_documentation_run(request: JobCreateRequest, db: Session = Dep
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    new_job = Job(repo_id=request.repo_id, status="pending", created_at=datetime.utcnow())
+    new_job = Job(repo_id=request.repo_id, status="pending", created_at=datetime.now(timezone.utc))
     db.add(new_job)
     db.commit()
     db.refresh(new_job)
@@ -209,24 +226,97 @@ async def get_all_jobs(db: Session = Depends(get_db)):
 # - Creating a pull request with generated documentation
 # - Handling webhooks from GitHub (e.g., push events, PR events)
 
-def github_app_fork_repo(repo_url: str) -> Dict:
+async def github_app_fork_repo(repo_url: str, access_token: str) -> Dict:
     """
-    Placeholder for forking a GitHub repository via the GitHub App.
+    Forks a GitHub repository using the GitHub API with httpx.
+    Parses the repository URL to extract owner/repo, then makes a POST request to create a fork.
     """
-    print(f"STUB: Forking repository: {repo_url}")
-    return {"status": "success", "message": "Repository forked (stub)"}
+    # Parse repository from URL (assumes format https://github.com/owner/repo or owner/repo)
+    parts = [p for p in repo_url.replace("$.git", "").split("/") if p][-2:]
+    if len(parts) != 2:
+        return {"status": "error", "message": "Invalid repository URL format"}
+    owner, repo_name = parts
 
-def github_app_create_pull_request(repo_url: str, branch_name: str, commit_message: str) -> Dict:
-    """
-    Placeholder for creating a pull request with generated documentation.
-    """
-    print(f"STUB: Creating PR for {repo_url} on branch {branch_name} with message: {commit_message}")
-    return {"status": "success", "message": "Pull request created (stub)"}
+    fork_url = f"https://api.github.com/repos/{owner}/{repo_name}/forks"
+    headers = {
+        "Authorization": f"token {access_token}",
+        "Accept": "application/vnd.github+json"
+    }
 
-def github_app_handle_webhook(payload: Dict, headers: Dict) -> Dict:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(fork_url, headers=headers)
+            response.raise_for_status()
+            forked_repo = response.json()
+            return {
+                "status": "success",
+                "message": f"Repository forked to {forked_repo.get('html_url')}",
+                "forked_repo": forked_repo
+            }
+        except httpx.HTTPStatusError as e:
+            return {"status": "error", "message": f"Fork failed: {e.response.status_code} - {e.response.text}"}
+        except Exception as e:
+            return {"status": "error", "message": f"Error forking repository: {str(e)}"}
+
+async def github_app_create_pull_request(repo_url: str, branch_name: str, commit_message: str, access_token: str) -> Dict:
     """
-    Placeholder for handling GitHub webhook events.
+    Creates a pull request using the GitHub API with httpx.
+    Creates a PR from the specified branch to the default branch with the commit message as body.
     """
-    print("STUB: Handling GitHub webhook event.")
-    # In a real scenario, verify signature, parse payload, and dispatch to appropriate handlers
-    return {"status": "success", "message": "Webhook handled (stub)"}
+    # Parse repository
+    parts = [p for p in repo_url.replace("$.git", "").split("/") if p][-2:]
+    if len(parts) != 2:
+        return {"status": "error", "message": "Invalid repository URL format"}
+    owner, repo_name = parts
+
+    pulls_url = f"https://api.github.com/repos/{owner}/{repo_name}/pulls"
+    headers = {
+        "Authorization": f"token {access_token}",
+        "Accept": "application/vnd.github+json"
+    }
+    pr_data = {
+        "title": f"Add generated documentation ({branch_name})",
+        "head": branch_name,
+        "base": "main",  # Assume default branch is main
+        "body": commit_message
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(pulls_url, headers=headers, json=pr_data)
+            response.raise_for_status()
+            pr_info = response.json()
+            return {
+                "status": "success",
+                "message": f"Pull request created: {pr_info.get('html_url')}",
+                "pull_request": pr_info
+            }
+        except httpx.HTTPStatusError as e:
+            return {"status": "error", "message": f"PR creation failed: {e.response.status_code} - {e.response.text}"}
+        except Exception as e:
+            return {"status": "error", "message": f"Error creating PR: {str(e)}"}
+
+async def github_app_handle_webhook(payload: Dict, headers: Dict) -> Dict:
+    """
+    Handles basic GitHub webhook events using httpx for any additional API calls if needed.
+    Verifies event type and returns appropriate response. For actual signature verification,
+    additional crypto libraries and webhook secret would be required.
+    """
+    event_type = headers.get("X-GitHub-Event", "unknown")
+    signature = headers.get("X-Hub-Signature-256", "")
+
+    print(f"Handling GitHub webhook event: {event_type}")
+    # Basic implementation - in production, verify signature with webhook secret
+    if not signature:
+        return {"status": "error", "message": "Missing webhook signature"}
+
+    # For basic functionality, assume signature is valid and process the event
+    if event_type == "push":
+        # Example: could check if push is to docs branch, trigger rebuild
+        branch = payload.get("ref", "").split("/")[-1]
+        return {"status": "success", "message": f"Push event handled for branch {branch}"}
+    elif event_type == "pull_request":
+        action = payload.get("action")
+        return {"status": "success", "message": f"Pull request {action} event handled"}
+    else:
+        return {"status": "success", "message": f"Unknown event {event_type} received (basic handling)"}

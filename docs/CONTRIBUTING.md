@@ -19,12 +19,57 @@ The easiest way to get started is using Docker Compose:
 git clone https://github.com/your-username/fixmydocs.git
 cd fixmydocs
 
+# Copy environment template files
+cp backend/.env.template backend/.env
+cp frontend/.env.template frontend/.env
+cp worker/.env.template worker/.env
+cp .env.template .env
+
+# Edit .env files with your GitHub OAuth credentials and database URL
+nano backend/.env frontend/.env worker/.env .env
+
 # Start all services
 docker-compose up --build
 
 # Access the application:
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:8000
+# API Documentation: http://localhost:8000/docs
+```
+
+### Environment File Setup
+
+Before starting the services, configure the following environment files:
+
+**backend/.env:**
+```env
+DATABASE_URL=postgresql://user:password@db:5432/fixmydocs
+GITHUB_CLIENT_ID=your_github_oauth_app_id
+GITHUB_CLIENT_SECRET=your_github_oauth_app_secret
+GITHUB_CALLBACK_URL=http://localhost:8000/auth/github/callback
+SECRET_KEY=your-secret-key-here
+```
+
+**frontend/.env.local:**
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_GITHUB_CLIENT_ID=your_github_oauth_app_id
+```
+
+**worker/.env:**
+```env
+DATABASE_URL=postgresql://user:password@db:5432/fixmydocs
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+GITHUB_TOKEN=your_github_personal_access_token
+```
+
+**.env (root):**
+```env
+POSTGRES_DB=fixmydocs
+POSTGRES_USER=user
+POSTGRES_PASSWORD=password
+REDIS_URL=redis://redis:6379
 ```
 
 ### Local Development Setup
@@ -154,10 +199,12 @@ Comprehensive testing is crucial for maintaining code quality. This section outl
 
 ### Technology Stack
 
--   **Worker**: Celery
--   **Database**: PostgreSQL
--   **Backend/Worker Testing**: Pytest
--   **Frontend Testing**: Jest/React Testing Library
+-   **Worker**: Celery with Redis broker
+-   **Database**: PostgreSQL with SQLAlchemy ORM
+-   **Backend/Worker Testing**: Pytest with coverage reporting
+-   **Frontend Testing**: Jest/React Testing Library with jsdom
+-   **E2E Testing**: Pytest-based integration tests
+-   **CI/CD**: GitHub Actions with automated linting and testing
 
 ### Current Testing Structure
 
@@ -170,42 +217,76 @@ Comprehensive testing is crucial for maintaining code quality. This section outl
 To ensure code quality, run the following commands:
 
 ```bash
-# Run all linting checks
-npm run lint # For frontend
-# Add backend/worker linting command if available
+# Run all Docker-based tests (recommended)
+docker-compose -f docker-compose.yml -f docker-compose.test.yml up --build --abort-on-container-exit
 
-# Run all tests
+# Or run tests locally (requires local setup)
+
 # Frontend tests
 cd frontend
-npm test
+npm run lint  # ESLint checking
+npm test -- --watchAll=false --coverage  # Jest tests with coverage
 
 # Backend tests
 cd backend
-pytest
+python -m pytest tests/ -v --cov=. --cov-report=html
+python -m pytest tests/test_main.py -v
 
 # Worker tests
 cd worker
-pytest
+python -m pytest tests/ -v --cov=. --cov-report=html
+python -m pytest test_worker.py -v
+
+# E2E tests (integration tests)
+docker-compose up -d  # Start services first
+cd backend && python -m pytest test_e2e.py -v
 ```
 
 ### Test Coverage
 
-Maintain minimum test coverage of 80% for new code. Run coverage reports:
+Maintain minimum test coverage of 80% for new code. Current test structure includes:
+
+**Frontend Tests:**
+- Component tests with React Testing Library
+- Page integration tests
+- Mock server setup for API calls
+- Jest configuration with jsdom environment
+
+**Backend Tests:**
+- API endpoint unit tests
+- Database model tests
+- Authentication middleware tests
+- Integration tests with test database
+
+**Worker Tests:**
+- Celery task processing tests
+- Repository management tests
+- AI orchestration mock tests
+- Logging and error handling tests
+
+**E2E Tests:**
+- Full user workflow testing
+- API to worker pipeline validation
+- Docker-based environment testing
+
+Run coverage reports:
 
 ```bash
 # Frontend coverage
 cd frontend
-npm run test:coverage
+npm test -- --coverage --coverageDirectory=coverage
 
 # Backend coverage
 cd backend
-coverage run -m pytest
-coverage report
+python -m pytest --cov=app --cov-report=html --cov-report=term
 
 # Worker coverage
 cd worker
-coverage run -m pytest
-coverage report
+python -m pytest --cov=. --cov-report=html --cov-report=term
+
+# View HTML coverage reports
+# open backend/htmlcov/index.html
+# open frontend/coverage/lcov-report/index.html
 ```
 
 ## Documentation Guidelines

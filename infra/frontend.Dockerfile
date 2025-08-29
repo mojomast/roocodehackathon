@@ -7,8 +7,8 @@ WORKDIR /app/frontend
 # Copy package.json and package-lock.json (if exists) to the working directory
 COPY ./frontend/package*.json ./
 
-# Install Node.js dependencies
-RUN npm install
+# Install Node.js dependencies (production only)
+RUN npm ci --omit=dev
 
 # Copy the rest of the frontend code into the container
 COPY ./frontend .

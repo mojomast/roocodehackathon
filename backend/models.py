@@ -24,13 +24,25 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def get_db():
     """
     Dependency function to get a database session.
-    Yields a session and ensures it's closed after use.
+    Yields a session and ensures proper cleanup even on failures.
+    Handles errors to prevent session leaks and ensures transaction integrity.
     """
     db = SessionLocal()
     try:
         yield db
+    except Exception as e:
+        # Rollback on any exception to ensure clean state
+        try:
+            db.rollback()
+        except Exception:
+            pass  # Ignore rollback errors during cleanup
+        raise e
     finally:
-        db.close()
+        # Always close the session to prevent connection pool exhaustion
+        try:
+            db.close()
+        except Exception:
+            pass  # Ignore close errors during cleanup
 
 class User(Base):
     """

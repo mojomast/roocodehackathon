@@ -1,5 +1,6 @@
 // frontend/src/app/dashboard/page.tsx
 import React, { useState, useEffect } from 'react';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
@@ -20,11 +21,16 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
  * Renders the main Dashboard page.
  * Includes placeholder content for welcome message and gamification elements.
  */
-const DashboardPage: React.FC = () => {
+const DashboardPageContent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalRepos, setTotalRepos] = useState<number | null>(null);
   const [completedJobs, setCompletedJobs] = useState<number | null>(null);
+
+  // FE-004: Screenshots component state and loading
+  const [screenshots, setScreenshots] = useState<any[]>([]);
+  const [loadingScreenshots, setLoadingScreenshots] = useState(true);
+  const [errorScreenshots, setErrorScreenshots] = useState<string | null>(null);
 
   // Simulate data fetching
   useEffect(() => {
@@ -47,6 +53,28 @@ const DashboardPage: React.FC = () => {
     };
 
     fetchData();
+  }, []);
+
+  // FE-004: Fetch screenshots data for the component
+  useEffect(() => {
+    const fetchScreenshotsData = async () => {
+      try {
+        setLoadingScreenshots(true);
+        setErrorScreenshots(null);
+        const response = await fetch('/api/screenshots'); // Assuming this endpoint exists
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setScreenshots(data.screenshots || []);
+      } catch (err) {
+        setErrorScreenshots((err as Error).message);
+      } finally {
+        setLoadingScreenshots(false);
+      }
+    };
+
+    fetchScreenshotsData();
   }, []);
 
   // Hardcoded gamification values
@@ -104,11 +132,35 @@ const DashboardPage: React.FC = () => {
         )}
       </div>
 
+      {/* FE-004: Screenshots component with loading states and error handling */}
       <div className="bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Your Activity</h2>
-        <p className="text-gray-600">No recent activity to display.</p>
+        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Recent Screenshots</h2>
+        {loadingScreenshots && <LoadingSpinner />}
+        {errorScreenshots && <ErrorMessage message={`Failed to load screenshots: ${errorScreenshots}`} />}
+        {!loadingScreenshots && !errorScreenshots && screenshots.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {screenshots.map((screenshot, index) => (
+              <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                <img src={screenshot.url} alt={screenshot.description} className="w-full h-auto" />
+                <p className="text-sm text-gray-600 mt-2">{screenshot.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loadingScreenshots && !errorScreenshots && screenshots.length === 0 && (
+          <p className="text-gray-600">No recent screenshots to display.</p>
+        )}
       </div>
     </div>
+  );
+};
+
+// FE-004: Wrap DashboardPage with ErrorBoundary for comprehensive component error handling
+const DashboardPage: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <DashboardPageContent />
+    </ErrorBoundary>
   );
 };
 

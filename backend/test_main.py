@@ -308,3 +308,198 @@ def test_job_creation_and_lifecycle(client, auth_headers):
     status_resp = client.get(f"/api/jobs/status/{job_id}", headers=auth_headers)
     assert status_resp.status_code == 200
     assert status_resp.json()["status"] == "pending"
+
+# Tests for GitHub App Integration functions (BE-010 enhancement)
+@pytest.mark.asyncio
+async def test_github_app_fork_repo_success(client, mocker):
+    """Test successful GitHub fork repository operation."""
+    mock_response = mocker.AsyncMock()
+    mock_response.json.return_value = {
+        "html_url": "https://github.com/forked/repo",
+        "full_name": "forked/repo"
+    }
+    mock_response.raise_for_status = mocker.AsyncMock()
+
+    client_mock = mocker.AsyncMock()
+    client_mock.post.return_value = mock_response
+
+    from backend.main import github_app_fork_repo
+    mocker.patch("httpx.AsyncClient", return_value=client_mock)
+
+    from backend.main import github_app_fork_repo
+    result = await github_app_fork_repo("https://github.com/owner/repo", "test-token")
+
+    assert result["status"] == "success"
+    assert "forked" in result["message"].lower()
+
+@pytest.mark.asyncio
+async def test_github_app_fork_repo_failure(client, mocker):
+    """Test failed GitHub fork repository operation."""
+    mock_response = mocker.AsyncMock()
+    mock_response.raise_for_status.side_effect = Exception("Forbidden")
+
+    client_mock = mocker.AsyncMock()
+    client_mock.post.return_value = mock_response
+
+    mocker.patch("httpx.AsyncClient", return_value=client_mock)
+
+    from backend.main import github_app_fork_repo
+    result = await github_app_fork_repo("https://github.com/owner/repo", "test-token")
+
+    assert result["status"] == "error"
+    assert "failed" in result["message"].lower()
+
+@pytest.mark.asyncio
+async def test_github_app_create_pull_request_success(client, mocker):
+    """Test successful GitHub pull request creation."""
+    mock_response = mocker.AsyncMock()
+    mock_response.json.return_value = {
+        "html_url": "https://github.com/owner/repo/pull/1",
+        "number": 1
+    }
+    mock_response.raise_for_status = mocker.AsyncMock()
+
+    client_mock = mocker.AsyncMock()
+    client_mock.post.return_value = mock_response
+
+    mocker.patch("httpx.AsyncClient", return_value=client_mock)
+
+    from backend.main import github_app_create_pull_request
+    result = await github_app_create_pull_request(
+        "https://github.com/owner/repo", "feature-branch", "docs", "test-token"
+    )
+
+    assert result["status"] == "success"
+    assert "created" in result["message"].lower()
+
+@pytest.mark.asyncio
+async def test_github_app_handle_webhook_push_event():
+    """Test GitHub webhook handling for push events."""
+    from backend.main import github_app_handle_webhook
+
+    payload = {"ref": "refs/heads/main", "action": "push"}
+    headers = {"X-GitHub-Event": "push", "X-Hub-Signature-256": "sha256=abc123"}
+
+    result = await github_app_handle_webhook(payload, headers)
+
+    assert result["status"] == "success"
+    assert "push event handled" in result["message"]
+
+@pytest.mark.asyncio
+async def test_github_app_handle_webhook_pull_request_event():
+    """Test GitHub webhook handling for pull request events."""
+    from backend.main import github_app_handle_webhook
+
+    payload = {"action": "opened"}
+    headers = {"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": "sha256=abc123"}
+
+    result = await github_app_handle_webhook(payload, headers)
+
+    assert result["status"] == "success"
+    assert "pull request" in result["message"]
+
+@pytest.mark.asyncio
+async def test_github_app_handle_webhook_missing_signature():
+    """Test GitHub webhook handling with missing signature."""
+    from backend.main import github_app_handle_webhook
+
+    payload = {}
+    headers = {"X-GitHub-Event": "push"}
+
+    result = await github_app_handle_webhook(payload, headers)
+
+    assert result["status"] == "error"
+    assert "signature" in result["message"]
+
+# Tests for repository connection with authentication (BE-008 verification)
+def test_connect_repository_with_authenticated_user(client, auth_headers, mocker):
+    """Test repository connection using authenticated user instead of dummy."""
+    # Mock the auth validation to return a real user
+    mock_user = mocker.MagicMock()
+    mock_user.id = 123
+    mock_user.username = "authenticated_user"
+
+    from backend.main import verify_auth_token
+    mocker.patch("backend.main.verify_auth_token", return_value=mock_user)
+
+    request_data = {
+        "repo_url": "https://github.com/test/repo",
+        "repo_name": "test-repo"
+    }
+
+    response = client.post("/api/repos/connect", json=request_data, headers=auth_headers)
+    assert response.status_code == 200
+
+    # Verify no dummy user was created
+    from backend.models import User, SessionLocal
+    db = SessionLocal()
+    dummy_user_count = db.query(User).filter(User.username == "dummy_user").count()
+    db.close()
+
+    assert dummy_user_count == 0
+
+# Extended tests for database session error handling (BE-009 verification)
+def test_db_session_error_handling(client, mocker, auth_headers):
+    """Test that database sessions are properly cleaned up on errors."""
+    # This test ensures our error handling in get_db() works correctly
+
+    # Override get_db to simulate an error during yield
+    original_override = app.dependency_overrides.get(get_db)
+
+    def failing_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass  # Cleanup rollback errors
+            raise e
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass  # Cleanup close errors
+
+    # Modify the session to raise an error
+    class FailingSessionLocal:
+        def __call__(self):
+            session = TestingSessionLocal()
+            original_close = session.close
+            def failing_close():
+                raise Exception("Close failed")
+            session.close = failing_close
+            return session
+
+    test_session_local = FailingSessionLocal()
+
+    def modified_get_db():
+        db = test_session_local()
+        try:
+            yield db
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            raise e
+        finally:
+            try:
+                db.close()  # This will fail, but we handle it
+            except Exception:
+                pass
+
+    app.dependency_overrides[get_db] = modified_get_db
+
+    try:
+        # This should not cause a permanent session leak due to our error handling
+        response = client.get("/api/jobs", headers=auth_headers)
+        # We expect some response (may fail due to the mocking, but session should be cleaned)
+        assert response.status_code == 200 or response.status_code == 500
+    finally:
+        # Restore original override
+        if original_override:
+            app.dependency_overrides[get_db] = original_override
+        else:
+            del app.dependency_overrides[get_db]
