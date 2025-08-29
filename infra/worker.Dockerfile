@@ -1,17 +1,17 @@
-# Set the base image
-FROM python:3.9-slim
+# Use the official Python image as the base image
+FROM python:3.9-slim-buster
 
-# Set the working directory
-WORKDIR /app
+# Set the working directory in the container
+WORKDIR /app/worker
 
-# Copy the requirements file
-COPY worker/requirements.txt .
+# Copy the requirements file into the container
+COPY ./worker/requirements.txt .
 
-# Install the dependencies
+# Install the Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
-COPY worker/ .
+# Copy the rest of the worker code into the container
+COPY ./worker .
 
-# Run the worker
-CMD ["celery", "-A", "worker.celery", "worker", "--loglevel=info"]
+# Command to run the Celery worker
+CMD ["celery", "-A", "worker", "worker", "--loglevel=info"]

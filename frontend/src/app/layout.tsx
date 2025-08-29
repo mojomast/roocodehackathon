@@ -24,10 +24,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex`}>
+        {/* Sidebar Navigation */}
+        <nav className="w-64 bg-gray-800 text-white p-4 min-h-screen">
+          <h2 className="text-2xl font-bold mb-6">FixMyDocs</h2>
+          <ul>
+            <li className="mb-2">
+              <a href="/dashboard" className="block hover:text-blue-300">Dashboard</a>
+            </li>
+            <li className="mb-2">
+              <a href="/repos" className="block hover:text-blue-300">Repositories</a>
+            </li>
+            <li className="mb-2">
+              <a href="/jobs" className="block hover:text-blue-300">Jobs</a>
+            </li>
+          </ul>
+        </nav>
+        {/* Main content area */}
+        <main className="flex-1">
+          {children}
+        </main>
       </body>
     </html>
   );

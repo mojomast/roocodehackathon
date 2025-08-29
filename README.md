@@ -1,14 +1,23 @@
-# FixMyDocs Hackathon
+# FixMyDocs
 
-This project is part of the FixMyDocs hackathon. The goal is to improve the documentation of this project.
+FixMyDocs is a comprehensive application designed to streamline documentation processes. It provides a robust platform for managing, updating, and maintaining project documentation, ensuring accuracy and accessibility.
 
-## Goals
+## Getting Started
 
-- Create a comprehensive and easy-to-understand documentation.
-- Ensure all code is well-documented.
-- Provide clear instructions for setup and contribution.
+Follow these steps to set up and run the FixMyDocs application locally:
 
-## Setup
+1.  **Create `.env` files:**
+    For each service (backend, frontend, worker), create a `.env` file by copying its respective `.env.template` file.
+    -   `cp backend/.env.template backend/.env`
+    -   `cp frontend/.env.template frontend/.env`
+    -   `cp worker/.env.template worker/.env`
 
-1.  Clone the repository.
-2.  Follow the instructions in `docs/CONTRIBUTING.md` to set up the development environment.
+2.  **Build and Run with Docker Compose:**
+    Navigate to the root directory of the project and execute the following command to build and start all services:
+    ```bash
+    docker-compose up --build
+    ```
+
+3.  **Access the Frontend:**
+    Once the services are up and running, you can access the frontend application in your web browser at:
+    `http://localhost:3000`

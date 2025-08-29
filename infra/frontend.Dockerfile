@@ -1,32 +1,23 @@
-# Stage 1: Build the Next.js application
-FROM node:18-alpine AS builder
+# Use the official Node.js image as the base image
+FROM node:20-alpine
 
-# Set working directory
-WORKDIR /app
+# Set the working directory in the container
+WORKDIR /app/frontend
 
-# Copy package.json and package-lock.json
-COPY frontend/package*.json ./
+# Copy package.json and package-lock.json (if exists) to the working directory
+COPY ./frontend/package*.json ./
 
-# Install dependencies
+# Install Node.js dependencies
 RUN npm install
 
-# Copy the rest of the application
-COPY frontend/ .
+# Copy the rest of the frontend code into the container
+COPY ./frontend .
 
-# Build the application
+# Build the Next.js application
 RUN npm run build
 
-# Stage 2: Create the production image
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/.next/standalone /app/standalone
-COPY --from=builder /app/.next/static ./.next/static
-
+# Expose the port the Next.js application will run on
 EXPOSE 3000
 
-CMD ["node", "standalone/server.js"]
+# Command to run the Next.js application
+CMD ["npm", "start"]

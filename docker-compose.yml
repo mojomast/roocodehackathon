@@ -7,6 +7,11 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    volumes: # Mount the frontend code for development
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules # Anonymous volume to prevent host node_modules from overwriting container's
+    env_file:
+      - ./frontend/.env
     networks:
       - app-network
 
@@ -16,10 +21,12 @@ services:
       dockerfile: infra/backend.Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
+    env_file:
+      - ./backend/.env
     depends_on:
       - db
+    volumes: # Mount the backend code for development
+      - ./backend:/app/backend
     networks:
       - app-network
 
@@ -27,12 +34,13 @@ services:
     build:
       context: .
       dockerfile: infra/worker.Dockerfile
-    environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
-      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - ./worker/.env
     depends_on:
       - db
       - redis
+    volumes: # Mount the worker code for development
+      - ./worker:/app/worker
     networks:
       - app-network
 
