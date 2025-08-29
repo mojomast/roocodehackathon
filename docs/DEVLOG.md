@@ -44,6 +44,15 @@ The application now supports complete GitHub repository documentation workflows 
 
 This file will be used to document the development process of the project.
 
+## [2025-08-29 21:30] - P0 Milestone: Critical Fixes Completed
+
+- Added robust GitHub repo URL parsing helper and tests.
+- Implemented `GET /api/repos` and aligned frontend expectations.
+- Added GitHub webhook endpoint with HMAC SHA-256 verification (`X-Hub-Signature-256`).
+- Fixed worker repository validation and removed duplicate method in patcher.
+- Relaxed worker DB URL validation to accept SQLAlchemy URIs.
+- Updated tests and backlog with milestone commit hash.
+
 ## [2025-08-29 20:47] - Critical Fixes Milestone Completed
 
 - **Milestone Achievement**: Successfully fixed all 15 critical bugs across the application (BE-001 to BE-002, FE-001 to FE-002, WK-001 to WK-008, TS-001 to TS-003).

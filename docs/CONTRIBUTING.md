@@ -125,6 +125,15 @@ pip install -r requirements.txt
 python worker.py
 ```
 
+> Tip (Windows): You can also create a single workspace venv at repo root (e.g., `.venv`) and install both backend and worker requirements there.
+
+**Local Testing DB / Secrets:**
+```powershell
+# From repo root, PowerShell
+$env:DATABASE_URL = "sqlite:///./test.db"
+$env:GITHUB_WEBHOOK_SECRET = "dev_secret_change_me"
+```
+
 **Enhanced Build Commands:**
 ```bash
 # Frontend linting and formatting

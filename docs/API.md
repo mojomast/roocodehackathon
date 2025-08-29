@@ -87,6 +87,10 @@ Returns all repositories connected by the authenticated user.
 }
 ```
 
+Notes:
+- Results are scoped to the authenticated user.
+- Future: support for sorting and filtering by status.
+
 #### Disconnect Repository
 **DELETE** `/api/repos/{id}`
 
@@ -286,6 +290,20 @@ Returns the health status of the service.
   }
 }
 ```
+### Webhooks
+
+#### GitHub Webhook Receiver
+**POST** `/api/github/webhook`
+
+Verifies `X-Hub-Signature-256` using HMAC SHA-256 with `GITHUB_WEBHOOK_SECRET`. Invalid signatures return 401.
+
+Headers:
+- `X-Hub-Signature-256: sha256=<hex_signature>`
+- `X-GitHub-Event`
+
+Response:
+- `202 Accepted` on valid signature and accepted event
+- `401 Unauthorized` on invalid/missing signature
 
 ### Error Handling
 

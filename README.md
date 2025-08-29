@@ -62,6 +62,9 @@ The application is designed with a microservices architecture, containerized wit
     **Health Checks:**
     - `GET /health` - Service health check endpoint
 
+    **GitHub Webhook:**
+    - `POST /api/github/webhook` - Receives GitHub events. Requests must include `X-Hub-Signature-256` and will be verified via HMAC SHA-256 with `GITHUB_WEBHOOK_SECRET`. Invalid signatures return 401.
+
 For detailed API documentation including Python examples for the worker agent integration, see [Agent API Reference](docs/agentapi.md).
 
 ## 📚 Documentation
@@ -96,7 +99,16 @@ For questions about specific documentation files, refer to their contents or che
 3.  **Development vs Production**:
     -   **Development**: Use default localhost URIs in `.env` files (e.g., `http://localhost:8000` for API URL). This setup runs all services locally via Docker Compose.
     -   **Production**: Update `.env` files with production URIs (e.g., production GitHub OAuth callback URL, external database URL). Use individual Docker builds with the provided `infra/` Dockerfiles.
-4.  **Build and Run**:
+4.  **Python Virtual Environment (optional but recommended)**:
+    ```powershell
+    # From repo root on Windows PowerShell
+    python -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    python -m pip install -U pip
+    pip install -r backend\requirements.txt -r worker\requirements.txt
+    ```
+
+5.  **Build and Run**:
     ```bash
     # Development (all services)
     docker-compose up --build
@@ -106,6 +118,23 @@ For questions about specific documentation files, refer to their contents or che
     docker build -f infra/frontend.Dockerfile -t fixmydocs-frontend .
     docker build -f infra/worker.Dockerfile -t fixmydocs-worker .
     ```
-5.  **Access**:
+6.  **Access**:
     -   Frontend: `http://localhost:3000`
     -   Backend API Docs: `http://localhost:8000/docs`
+
+## 🔒 Security & Webhooks
+
+- Webhook endpoint: `POST /api/github/webhook`
+- Required header: `X-Hub-Signature-256`
+- Secret: set `GITHUB_WEBHOOK_SECRET` in backend `.env`
+
+Example backend `.env` additions:
+```env
+GITHUB_WEBHOOK_SECRET=dev_secret_change_me
+```
+
+Local test (example):
+```
+echo -n '{"zen":"Keep it logically awesome."}' > payload.json
+# Compute HMAC using your secret and send with header (pseudo, compute signature in your tool)
+```
