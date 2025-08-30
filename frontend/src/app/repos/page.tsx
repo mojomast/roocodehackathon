@@ -1,3 +1,4 @@
+"use client";
 // frontend/src/app/repos/page.tsx
 import React, { useState, useEffect } from 'react';
 import { apiClient, Repo, APIError } from '../../utils/apiClient';

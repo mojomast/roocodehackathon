@@ -1,6 +1,7 @@
+"use client";
 // frontend/src/app/jobs/page.tsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { apiClient, Job, JobStatusResponse, APIError } from '../../utils/apiClient';
+import React, { useState, useEffect, useRef } from 'react';
+import { apiClient, Job, APIError } from '../../utils/apiClient';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (

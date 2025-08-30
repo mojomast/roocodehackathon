@@ -68,25 +68,9 @@ def auth_headers():
     """Mock authentication headers."""
     return {"X-Auth-Token": "test-token"}
 
-# Test cases
-
-def test_read_root():
-    """Test root endpoint."""
-    client = TestClient(app)
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to the FixMyDocs Backend API!"}
-
-def test_github_auth_redirect():
-    """Test GitHub auth redirect."""
-    client = TestClient(app)
-    response = client.get("/api/auth/github")
-    assert response.status_code == 302
-    assert "github.com/login/oauth/authorize" in str(response.url)
-
-def test_github_callback_success(client, mocker):
-    """Test successful GitHub callback."""
-    # Mock httpx AsyncClient
+@pytest.fixture
+def mock_github_api(mocker):
+    """Mock the GitHub API for authentication."""
     mock_response_token = mocker.AsyncMock()
     mock_response_token.json.return_value = {"access_token": "test_access_token"}
     mock_response_token.raise_for_status = mocker.AsyncMock()
@@ -104,14 +88,29 @@ def test_github_callback_success(client, mocker):
     client_mock.get.return_value = mock_response_user
 
     mocker.patch("httpx.AsyncClient", return_value=client_mock)
+    return client_mock
 
+# Test cases
+
+def test_read_root(client):
+    """Test root endpoint."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Welcome to the FixMyDocs Backend API!"}
+
+def test_github_auth_redirect(client):
+    """Test GitHub auth redirect."""
+    response = client.get("/api/auth/github")
+    assert response.status_code == 302
+    assert "github.com/login/oauth/authorize" in str(response.url)
+
+def test_github_callback_success(client, mock_github_api):
+    """Test successful GitHub callback."""
     response = client.get("/auth/github/callback?code=test_code")
     assert response.status_code == 302
-    # Verify redirect to frontend dashboard
 
-def test_github_callback_missing_code():
+def test_github_callback_missing_code(client):
     """Test GitHub callback with missing code."""
-    client = TestClient(app)
     response = client.get("/auth/github/callback")
     assert response.status_code == 422  # Missing required query parameter
 
@@ -141,14 +140,13 @@ def test_connect_repository_success(client, auth_headers):
     assert "message" in data
     assert "repo_id" in data
 
-def test_connect_repository_missing_auth():
+def test_connect_repository_missing_auth(client):
     """Test repository connection without auth."""
     request_data = {
         "repo_url": "https://github.com/test/repo",
         "repo_name": "test-repo"
     }
 
-    client = TestClient(app)
     response = client.post("/api/repos/connect", json=request_data)
     assert response.status_code == 401
 
@@ -163,8 +161,8 @@ def test_trigger_doc_run_success(client, auth_headers):
     """Test successful documentation run trigger."""
     # First create a repo
     repo_data = {
-        "repo_url": "https://github.com/test/repo",
-        "repo_name": "test-repo"
+        "repo_url": "https://github.com/test/repo2",
+        "repo_name": "test-repo2"
     }
     client.post("/api/repos/connect", json=repo_data, headers=auth_headers)
 
@@ -176,9 +174,8 @@ def test_trigger_doc_run_success(client, auth_headers):
     assert "job_id" in data
     assert data["status"] == "pending"
 
-def test_trigger_doc_run_missing_auth():
+def test_trigger_doc_run_missing_auth(client):
     """Test doc run trigger without auth."""
-    client = TestClient(app)
     response = client.post("/api/docs/run", json={"repo_id": 1})
     assert response.status_code == 401
 
@@ -193,12 +190,12 @@ def test_get_job_status_success(client, auth_headers):
     """Test getting job status successfully."""
     # Create job first
     repo_data = {
-        "repo_url": "https://github.com/test/repo",
-        "repo_name": "test-repo"
+        "repo_url": "https://github.com/test/repo3",
+        "repo_name": "test-repo3"
     }
     client.post("/api/repos/connect", json=repo_data, headers=auth_headers)
 
-    job_resp = client.post("/api/docs/run", json={"repo_id": 1}, headers=auth_headers)
+    job_resp = client.post("/api/docs/run", json={"repo_id": 2}, headers=auth_headers)
     job_id = job_resp.json()["job_id"]
 
     response = client.get(f"/api/jobs/status/{job_id}", headers=auth_headers)
@@ -207,9 +204,8 @@ def test_get_job_status_success(client, auth_headers):
     assert data["job_id"] == job_id
     assert "status" in data
 
-def test_get_job_status_missing_auth():
+def test_get_job_status_missing_auth(client):
     """Test job status without auth."""
-    client = TestClient(app)
     response = client.get("/api/jobs/status/1")
     assert response.status_code == 401
 
@@ -225,41 +221,21 @@ def test_get_all_jobs(client, auth_headers):
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
-def test_get_all_jobs_missing_auth():
+def test_get_all_jobs_missing_auth(client):
     """Test all jobs without auth."""
-    client = TestClient(app)
     response = client.get("/api/jobs")
     assert response.status_code == 401
 
 # Database integration tests
 
-def test_user_creation_in_github_callback(client, mocker):
+def test_user_creation_in_github_callback(client, mock_github_api):
     """Test user creation during authentication."""
-    # Mock httpx
-    mock_response_token = mocker.AsyncMock()
-    mock_response_token.json.return_value = {"access_token": "test_access"}
-    mock_response_token.raise_for_status = mocker.AsyncMock()
-
-    mock_response_user = mocker.AsyncMock()
-    mock_response_user.json.return_value = {
-        "id": "456",
-        "login": "newuser",
-        "email": "new@example.com"
-    }
-    mock_response_user.raise_for_status = mocker.AsyncMock()
-
-    client_mock = mocker.AsyncMock()
-    client_mock.post.return_value = mock_response_token
-    client_mock.get.return_value = mock_response_user
-
-    mocker.patch("httpx.AsyncClient", return_value=client_mock)
-
     # Count users before
     db = TestingSessionLocal()
     before_count = db.query(User).count()
     db.close()
 
-    client.get("/auth/github/callback?code=test_code")
+    client.get("/auth/github/callback?code=test_code_new_user")
 
     # Count users after
     db = TestingSessionLocal()
@@ -268,17 +244,33 @@ def test_user_creation_in_github_callback(client, mocker):
 
     assert after_count == before_count + 1
 
+def test_user_already_exists_in_github_callback(client, mock_github_api):
+    """Test that an existing user is retrieved and not duplicated."""
+    db = TestingSessionLocal()
+    before_count = db.query(User).count()
+    db.close()
+
+    client.get("/auth/github/callback?code=test_code_existing_user")
+
+    db = TestingSessionLocal()
+    after_count = db.query(User).count()
+    user = db.query(User).filter(User.github_id == "gh_test").first()
+    db.close()
+
+    assert after_count == before_count
+    assert user.access_token == "test_access_token"
+
 def test_repo_association_with_user(client, auth_headers):
     """Test repo association with authenticated user."""
     response = client.post("/api/repos/connect", json={
-        "repo_url": "https://github.com/test/repo",
-        "repo_name": "test-repo"
+        "repo_url": "https://github.com/test/repo4",
+        "repo_name": "test-repo4"
     }, headers=auth_headers)
 
     assert response.status_code == 200
 
     db = TestingSessionLocal()
-    repo = db.query(Repo).first()
+    repo = db.query(Repo).filter(Repo.repo_name == "test-repo4").first()
     user = db.query(User).filter(User.username == "testuser").first()
     db.close()
 
@@ -286,18 +278,35 @@ def test_repo_association_with_user(client, auth_headers):
     assert user is not None
     assert repo.user_id == user.id
 
+def test_connect_repository_already_exists(client, auth_headers):
+    """Test that connecting an existing repository fails."""
+    # First, connect the repository
+    client.post("/api/repos/connect", json={
+        "repo_url": "https://github.com/test/repo5",
+        "repo_name": "test-repo5"
+    }, headers=auth_headers)
+
+    # Attempt to connect the same repository again
+    response = client.post("/api/repos/connect", json={
+        "repo_url": "https://github.com/test/repo5",
+        "repo_name": "test-repo5"
+    }, headers=auth_headers)
+
+    assert response.status_code == 409
+    assert "already exists" in response.json()["detail"]
+
 def test_job_creation_and_lifecycle(client, auth_headers):
     """Test job creation and status tracking."""
     from backend.models import Job
 
     # Create repo
     client.post("/api/repos/connect", json={
-        "repo_url": "https://github.com/test/repo",
-        "repo_name": "test-repo"
+        "repo_url": "https://github.com/test/repo6",
+        "repo_name": "test-repo6"
     }, headers=auth_headers)
 
     # Create job
-    response = client.post("/api/docs/run", json={"repo_id": 1}, headers=auth_headers)
+    response = client.post("/api/docs/run", json={"repo_id": 3}, headers=auth_headers)
     job_id = response.json()["job_id"]
 
     db = TestingSessionLocal()
@@ -305,7 +314,7 @@ def test_job_creation_and_lifecycle(client, auth_headers):
     db.close()
 
     assert job is not None
-    assert job.repo_id == 1
+    assert job.repo_id == 3
     assert job.status == "pending"
 
     # Test status endpoint
@@ -313,23 +322,39 @@ def test_job_creation_and_lifecycle(client, auth_headers):
     assert status_resp.status_code == 200
     assert status_resp.json()["status"] == "pending"
 
+def test_get_job_status_unauthorized_access(client, auth_headers):
+    """Test that a user cannot access another user's job."""
+    db = TestingSessionLocal()
+    try:
+        # Create a second user and their repo and job
+        other_user = User(github_id="other_user", username="otheruser", access_token="other-token", email="other@example.com")
+        db.add(other_user)
+        db.commit()
+        db.refresh(other_user)
+
+        other_repo = Repo(repo_name="other-repo", repo_url="https://github.com/other/repo", user_id=other_user.id)
+        db.add(other_repo)
+        db.commit()
+        db.refresh(other_repo)
+
+        other_job = Job(repo_id=other_repo.id, status="pending")
+        db.add(other_job)
+        db.commit()
+        db.refresh(other_job)
+        other_job_id = other_job.id
+    finally:
+        db.close()
+
+    # Attempt to access the other user's job with the primary user's auth
+    response = client.get(f"/api/jobs/status/{other_job_id}", headers=auth_headers)
+
+    assert response.status_code == 404
+    assert "Job not found" in response.json()["detail"]
+
 # Tests for GitHub App Integration functions (BE-010 enhancement)
 @pytest.mark.asyncio
-async def test_github_app_fork_repo_success(client, mocker):
+async def test_github_app_fork_repo_success(client, mock_github_api):
     """Test successful GitHub fork repository operation."""
-    mock_response = mocker.AsyncMock()
-    mock_response.json.return_value = {
-        "html_url": "https://github.com/forked/repo",
-        "full_name": "forked/repo"
-    }
-    mock_response.raise_for_status = mocker.AsyncMock()
-
-    client_mock = mocker.AsyncMock()
-    client_mock.post.return_value = mock_response
-
-    from backend.main import github_app_fork_repo
-    mocker.patch("httpx.AsyncClient", return_value=client_mock)
-
     from backend.main import github_app_fork_repo
     result = await github_app_fork_repo("https://github.com/owner/repo", "test-token")
 
@@ -354,20 +379,8 @@ async def test_github_app_fork_repo_failure(client, mocker):
     assert "failed" in result["message"].lower()
 
 @pytest.mark.asyncio
-async def test_github_app_create_pull_request_success(client, mocker):
+async def test_github_app_create_pull_request_success(client, mock_github_api):
     """Test successful GitHub pull request creation."""
-    mock_response = mocker.AsyncMock()
-    mock_response.json.return_value = {
-        "html_url": "https://github.com/owner/repo/pull/1",
-        "number": 1
-    }
-    mock_response.raise_for_status = mocker.AsyncMock()
-
-    client_mock = mocker.AsyncMock()
-    client_mock.post.return_value = mock_response
-
-    mocker.patch("httpx.AsyncClient", return_value=client_mock)
-
     from backend.main import github_app_create_pull_request
     result = await github_app_create_pull_request(
         "https://github.com/owner/repo", "feature-branch", "docs", "test-token"
@@ -405,12 +418,12 @@ async def test_github_app_handle_webhook_pull_request_event():
 def test_list_repositories_endpoint(client, auth_headers):
     """GET /api/repos returns user repositories."""
     # connect a repo first
-    client.post("/api/repos/connect", json={"repo_url":"https://github.com/owner/repo","repo_name":"repo"}, headers=auth_headers)
+    client.post("/api/repos/connect", json={"repo_url":"https://github.com/owner/repo7","repo_name":"repo7"}, headers=auth_headers)
     resp = client.get("/api/repos", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    assert any(r["repo_name"] == "repo" for r in data)
+    assert any(r["repo_name"] == "repo7" for r in data)
 
 def test_parse_github_repo_variants():
     """Repository URL parsing handles https, .git, ssh, and owner/repo."""
@@ -477,8 +490,8 @@ def test_connect_repository_with_authenticated_user(client, auth_headers, mocker
     mocker.patch("backend.main.verify_auth_token", return_value=mock_user)
 
     request_data = {
-        "repo_url": "https://github.com/test/repo",
-        "repo_name": "test-repo"
+        "repo_url": "https://github.com/test/repo8",
+        "repo_name": "test-repo8"
     }
 
     response = client.post("/api/repos/connect", json=request_data, headers=auth_headers)

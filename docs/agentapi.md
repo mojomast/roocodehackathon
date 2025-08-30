@@ -68,30 +68,28 @@ async def connect_repository(repo_url: str, access_token: str) -> Dict[str, str]
     Returns:
         Dict[str, str]: Repository connection details
     """
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = {"X-Auth-Token": access_token}
     
     data = {
-        "repository_url": repo_url
+        "repo_url": repo_url
     }
     
     response = await client.post("api/repos/connect", json=data, headers=headers)
     return response.json()
 ```
 
-**Request Payload:**  
+**Request Payload:**
 ```json
 {
-  "repository_url": "https://github.com/username/repository"
+  "repo_url": "https://github.com/username/repository"
 }
 ```
 
-**Response:**  
+**Response:**
 ```json
 {
-  "repo_id": "123",
-  "owner": "username",
-  "name": "repository",
-  "connected_at": "2025-08-29T20:08:44.826Z"
+  "message": "Repository connected successfully",
+  "repo_id": 123
 }
 ```
 
@@ -111,27 +109,21 @@ async def list_repositories(access_token: str) -> Dict[str, list]:
 **Purpose:** Initiate a new documentation generation job
 
 ```python
-async def create_documentation_job(repo_id: int, access_token: str, job_type: str = "docstring_generation") -> Dict[str, str]:
+async def create_documentation_job(repo_id: int, access_token: str) -> Dict[str, str]:
     """
     Start a documentation generation job for a repository
 
     Args:
         repo_id (int): Repository ID from connect_repository response
         access_token (str): User's GitHub access token
-        job_type (str): Type of job ("docstring_generation", "readme_update", "inline_comments")
 
     Returns:
         Dict[str, str]: Job details including job ID
     """
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = {"X-Auth-Token": access_token}
 
     data = {
-        "repository_id": repo_id,
-        "job_type": job_type,
-        "options": {
-            "target_files": ["*.py", "*.js"],
-            "documentation_style": "google"
-        }
+        "repo_id": repo_id
     }
 
     response = await client.post("api/jobs", json=data, headers=headers)
@@ -141,25 +133,15 @@ async def create_documentation_job(repo_id: int, access_token: str, job_type: st
 **Request Payload:**
 ```json
 {
-  "repository_id": 123,
-  "job_type": "docstring_generation",
-  "options": {
-    "target_files": ["*.py", "*.js"],
-    "documentation_style": "google"
-  }
+  "repo_id": 123
 }
 ```
 
 **Response:**
 ```json
 {
-  "id": 456,
-  "repository_id": 123,
-  "status": "pending",
-  "job_type": "docstring_generation",
-  "created_at": "2025-08-29T20:08:44.826Z",
-  "started_at": null,
-  "completed_at": null
+  "job_id": 456,
+  "status": "pending"
 }
 ```
 

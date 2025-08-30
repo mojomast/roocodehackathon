@@ -3,6 +3,7 @@
  * Tests the typed API client with mocked fetch responses
  */
 
+import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { apiClient, setAuthToken, clearAuthToken, APIError } from '../apiClient';
 
 // Mock fetch globally
@@ -38,8 +39,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.connectRepo({
         repo_url: 'https://github.com/owner/repo',
@@ -63,8 +64,8 @@ describe('API Client Integration Tests', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
-        text: jest.fn().mockResolvedValue('Invalid repository URL'),
-      } as any);
+        text: () => Promise.resolve('Invalid repository URL'),
+      } as Response);
 
       await expect(apiClient.connectRepo({
         repo_url: 'invalid-url',
@@ -79,8 +80,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.getRepos();
 
@@ -95,8 +96,8 @@ describe('API Client Integration Tests', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: jest.fn().mockResolvedValue('Server error'),
-      } as any);
+        text: () => Promise.resolve('Server error'),
+      } as Response);
 
       await expect(apiClient.getRepos()).rejects.toThrow(APIError);
     });
@@ -108,8 +109,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.createJob({ repo_id: 1 });
 
@@ -129,8 +130,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.getJobs();
 
@@ -147,8 +148,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.getJobStatus(456);
 
@@ -163,8 +164,8 @@ describe('API Client Integration Tests', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
-        text: jest.fn().mockResolvedValue('Job not found'),
-      } as any);
+        text: () => Promise.resolve('Job not found'),
+      } as Response);
 
       await expect(apiClient.getJobStatus(999)).rejects.toThrow(APIError);
     });
@@ -180,8 +181,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.getDashboardStats();
 
@@ -193,8 +194,8 @@ describe('API Client Integration Tests', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      } as any);
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
 
       const result = await apiClient.getScreenshots();
 

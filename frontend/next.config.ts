@@ -1,3 +1,7 @@
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env['ANALYZE'] === 'true',
+});
+
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -54,12 +58,16 @@ const nextConfig: NextConfig = {
   // Performance monitoring
   poweredByHeader: false,
 
-  // Security headers
+  // Security headers - FE-002: Enhanced XSS Prevention
   async headers() {
     return [
       {
         source: '/(.*)',
         headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';",
+          },
           {
             key: 'X-Frame-Options',
             value: 'DENY',
@@ -70,7 +78,15 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'geolocation=(), microphone=(), camera=()',
           },
         ],
       },
@@ -78,4 +94,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

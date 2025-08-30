@@ -1,3 +1,4 @@
+"use client";
 // frontend/src/app/dashboard/page.tsx
 import React, { useState, useEffect } from 'react';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -5,14 +6,14 @@ import { apiClient, APIError } from '../../utils/apiClient';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
-  <div className="flex justify-center items-center py-4">
+  <div className="flex justify-center items-center py-4" aria-live="polite" aria-label="Loading content">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
   </div>
 );
 
 // Placeholder for a generic ErrorMessage component
 const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
-  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert" aria-live="assertive">
     <strong className="font-bold">Error:</strong>
     <span className="block sm:inline"> {message}</span>
   </div>
@@ -29,7 +30,7 @@ const DashboardPageContent: React.FC = () => {
   const [completedJobs, setCompletedJobs] = useState<number | null>(null);
 
   // FE-004: Screenshots component state and loading
-  const [screenshots, setScreenshots] = useState<any[]>([]);
+  const [screenshots, setScreenshots] = useState<{ url: string; description: string }[]>([]);
   const [loadingScreenshots, setLoadingScreenshots] = useState(true);
   const [errorScreenshots, setErrorScreenshots] = useState<string | null>(null);
 
@@ -63,7 +64,7 @@ const DashboardPageContent: React.FC = () => {
         setLoadingScreenshots(true);
         setErrorScreenshots(null);
         const data = await apiClient.getScreenshots();
-        setScreenshots(data.screenshots || []);
+        setScreenshots((data.screenshots || []).map((url: string) => ({ url, description: 'Screenshot' })));
       } catch (err) {
         if (err instanceof APIError) {
           setErrorScreenshots(`Failed to fetch screenshots: ${err.message}`);
@@ -94,17 +95,18 @@ const DashboardPageContent: React.FC = () => {
       </header>
 
       {/* Gamification Elements */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Points</h2>
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" aria-labelledby="gamification-heading">
+        <h2 id="gamification-heading" className="sr-only">Gamification Stats</h2>
+        <div className="bg-white p-6 rounded-lg shadow-md" aria-label={`Points: ${points.toLocaleString()}`}>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">Points</h3>
           <p className="text-2xl text-blue-600">{points.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Level</h2>
+        <div className="bg-white p-6 rounded-lg shadow-md" aria-label={`Level: ${level}`}>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">Level</h3>
           <p className="text-2xl text-green-600">{level}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Badges</h2>
+        <div className="bg-white p-6 rounded-lg shadow-md" aria-label="Badges">
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">Badges</h3>
           <div className="flex flex-wrap gap-2 mt-2">
             {badges.map((badge, index) => (
               <span key={index} className="bg-purple-100 text-purple-800 text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center">
@@ -114,46 +116,46 @@ const DashboardPageContent: React.FC = () => {
             {badges.length === 0 && <p className="text-gray-500 text-lg">None yet!</p>}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Summary Data */}
-      <div className="bg-white p-8 rounded-lg shadow-md mb-8">
-        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Summary</h2>
+      <section className="bg-white p-8 rounded-lg shadow-md mb-8" aria-labelledby="summary-heading">
+        <h2 id="summary-heading" className="text-2xl font-semibold text-gray-700 mb-4">Summary</h2>
         {loading && <LoadingSpinner />}
         {error && <ErrorMessage message={error} />}
         {!loading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-blue-50 p-4 rounded-lg" aria-label={`Connected Repositories: ${totalRepos}`}>
               <h3 className="text-lg font-medium text-gray-600">Connected Repositories</h3>
               <p className="text-3xl font-bold text-blue-700">{totalRepos}</p>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg">
+            <div className="bg-green-50 p-4 rounded-lg" aria-label={`Completed Jobs: ${completedJobs}`}>
               <h3 className="text-lg font-medium text-gray-600">Completed Jobs</h3>
               <p className="text-3xl font-bold text-green-700">{completedJobs}</p>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {/* FE-004: Screenshots component with loading states and error handling */}
-      <div className="bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Recent Screenshots</h2>
+      <section className="bg-white p-8 rounded-lg shadow-md" aria-labelledby="screenshots-heading">
+        <h2 id="screenshots-heading" className="text-2xl font-semibold text-gray-700 mb-4">Recent Screenshots</h2>
         {loadingScreenshots && <LoadingSpinner />}
         {errorScreenshots && <ErrorMessage message={`Failed to load screenshots: ${errorScreenshots}`} />}
         {!loadingScreenshots && !errorScreenshots && screenshots.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {screenshots.map((screenshot, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-lg">
+              <figure key={index} className="bg-gray-50 p-4 rounded-lg">
                 <img src={screenshot.url} alt={screenshot.description} className="w-full h-auto" />
-                <p className="text-sm text-gray-600 mt-2">{screenshot.description}</p>
-              </div>
+                <figcaption className="text-sm text-gray-600 mt-2">{screenshot.description}</figcaption>
+              </figure>
             ))}
           </div>
         )}
         {!loadingScreenshots && !errorScreenshots && screenshots.length === 0 && (
           <p className="text-gray-600">No recent screenshots to display.</p>
         )}
-      </div>
+      </section>
     </main>
   );
 };

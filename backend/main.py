@@ -64,6 +64,19 @@ def read_root():
     """
     return {"message": "Welcome to the FixMyDocs Backend API!"}
 
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """
+    Health check endpoint to verify database connectivity.
+    Returns a 200 OK response if the database is reachable, otherwise 503 Service Unavailable.
+    """
+    try:
+        # Simple query to check database connection
+        db.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database connection error: {e}")
+
 @app.get("/api/auth/github")
 async def github_auth(): # This route is excluded from authentication
     """

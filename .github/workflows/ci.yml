@@ -46,20 +46,23 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: lint
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
-      - name: Cache Python dependencies
+          python-version: ${{ matrix.python-version }}
+      - name: Cache pip dependencies
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-python-${{ hashFiles('**/requirements*.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-python-
+            ${{ runner.os }}-pip-
       - name: Install flake8
         run: pip install flake8
       - name: Install backend and worker dependencies
@@ -86,9 +89,16 @@ jobs:
         run: |
           cd frontend
           npm ci
+          npm run build
           npm test -- --coverage --watchAll=false
+          npm run test:performance
       - name: Upload coverage to Codecov (Frontend)
         uses: codecov/codecov-action@v3
         with:
           file: ./frontend/coverage/lcov.info
           flags: react-frontend
+      - name: Run E2E tests
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest-xdist
+          pytest backend/test_e2e.py -n auto

@@ -98,6 +98,23 @@ class Config:
         """
         return self._config.copy()
 
+    def __getattr__(self, name: str) -> Any:
+        """
+        Allow attribute-style access to configuration.
+
+        Args:
+            name (str): The configuration key.
+
+        Returns:
+            Any: The configuration value.
+
+        Raises:
+            AttributeError: If the configuration key is not found.
+        """
+        if name in self._config:
+            return self._config[name]
+        raise AttributeError(f"'Config' object has no attribute '{name}'")
+
     def validate_required(self) -> bool:
         """
         Validate that all required configuration is present.

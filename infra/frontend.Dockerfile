@@ -1,25 +1,43 @@
-# Use the official Node.js image as the base image
-FROM node:20-alpine
+# Stage 1: Build the application
+FROM node:20-alpine AS builder
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app/frontend
 
-# Copy package.json and package-lock.json (if exists) to the working directory
+# Copy package files
 COPY ./frontend/package*.json ./
 
-# Install Node.js dependencies (production only)
+# Install dependencies
+RUN --mount=type=cache,target=/root/.npm \
+    --mount=type=cache,target=/app/frontend/.npm \
+    npm ci
+
+# Copy the rest of the source code
+COPY ./frontend .
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Create the production image
+FROM node:20-alpine
+
+# Set the working directory
+WORKDIR /app/frontend
+
+# Copy package files
+COPY ./frontend/package*.json ./
+
+# Install production dependencies
 RUN --mount=type=cache,target=/root/.npm \
     --mount=type=cache,target=/app/frontend/.npm \
     npm ci --omit=dev
 
-# Copy the rest of the frontend code into the container
-COPY ./frontend .
+# Copy the built application from the builder stage
+COPY --from=builder /app/frontend/.next ./.next
+COPY --from=builder /app/frontend/public ./public
 
-# Build the Next.js application
-RUN npm run build
-
-# Expose the port the Next.js application will run on
+# Expose the port
 EXPOSE 3000
 
-# Command to run the Next.js application
+# Command to run the application
 CMD ["npm", "start"]

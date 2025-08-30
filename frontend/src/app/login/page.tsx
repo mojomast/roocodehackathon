@@ -1,3 +1,4 @@
+"use client";
 // frontend/src/app/login/page.tsx
 import React, { useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -21,7 +22,9 @@ const validateRedirectURL = (url: string | null): string | null => {
  * Renders the Login page with a GitHub OAuth button.
  * Implements XSS prevention by validating redirect URLs before auth flow.
  */
-const LoginPage: React.FC = () => {
+import { Suspense } from 'react';
+
+const LoginPageContent: React.FC = () => {
   const searchParams = useSearchParams();
 
   // Memoize redirect parameter validation to prevent unnecessary re-computations
@@ -59,4 +62,12 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default React.memo(LoginPage);
+const LoginPage: React.FC = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
+  );
+};
+
+export default LoginPage;

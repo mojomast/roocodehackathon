@@ -35,23 +35,26 @@ Connects a GitHub repository for documentation analysis.
 **Request Body:**
 ```json
 {
-  "repository_url": "https://github.com/username/repository-name",
-  "permissions": {
-    "contents": "read",
-    "pull_requests": "write"
-  }
+  "repo_url": "https://github.com/username/repository-name"
 }
 ```
 
 **Response (200):**
 ```json
 {
-  "id": 123,
-  "github_id": "MDEwOlJlcG9zaXRvcnkxMjM0NTY3ODk=",
-  "name": "username/repository-name",
-  "status": "connected",
-  "connected_at": "2025-08-29T21:30:00Z"
+  "message": "Repository connected successfully",
+  "repo_id": 123
 }
+```
+
+**Python Example:**
+```python
+import requests
+
+headers = {"X-Auth-Token": "your_auth_token"}
+data = {"repo_url": "https://github.com/username/repository-name"}
+response = requests.post("http://localhost:8000/api/repos/connect", headers=headers, json=data)
+print(response.json())
 ```
 
 **Error Responses:**
@@ -111,27 +114,26 @@ Initiates a new documentation analysis job for a connected repository.
 **Request Body:**
 ```json
 {
-  "repository_id": 123,
-  "job_type": "docstring_generation", // or "readme_update", "inline_comments"
-  "options": {
-    "target_files": ["*.py", "*.js"],
-    "exclude_patterns": ["tests/", "*.test.*"],
-    "documentation_style": "google"
-  }
+  "repo_id": 123
 }
 ```
 
-**Response (201):**
+**Response (200):**
 ```json
 {
-  "id": 456,
-  "repository_id": 123,
-  "status": "pending",
-  "job_type": "docstring_generation",
-  "created_at": "2025-08-29T21:30:00Z",
-  "started_at": null,
-  "completed_at": null
+  "job_id": 456,
+  "status": "pending"
 }
+```
+
+**Python Example:**
+```python
+import requests
+
+headers = {"X-Auth-Token": "your_auth_token"}
+data = {"repo_id": 123}
+response = requests.post("http://localhost:8000/api/jobs", headers=headers, json=data)
+print(response.json())
 ```
 
 **Error Responses:**

@@ -19,19 +19,18 @@ describe('DashboardPage', () => {
     expect(loadingElements.length).toBeGreaterThan(0);
   });
 
-  it('fetches and displays dashboard stats successfully', async () => {
+  it('fetches and displays dashboard stats with correct data', async () => {
     render(<DashboardPage />);
 
-    // Wait for data to load and spinner to disappear
     await waitFor(() => {
-      expect(screen.queryAllByText(/Loading/i)).toHaveLength(0);
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
     });
 
-    // Check for stats data
-    expect(screen.getByText('5')).toBeInTheDocument(); // totalRepos
-    expect(screen.getByText('12')).toBeInTheDocument(); // completedJobs
+    // Verify specific stats are displayed correctly
     expect(screen.getByText('Connected Repositories')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('Completed Jobs')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
   });
 
   it('handles API error for dashboard stats', async () => {
@@ -53,22 +52,23 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Connected Repositories')).not.toBeInTheDocument();
   });
 
-  it('displays screenshots correctly', async () => {
+  it('displays screenshots with correct alt text and sources', async () => {
     render(<DashboardPage />);
 
-    // Wait for screenshots to load
     await waitFor(() => {
       expect(screen.getByText('Recent Screenshots')).toBeInTheDocument();
     });
 
-    // Check for screenshot descriptions
+    // Verify screenshot content and attributes
     expect(screen.getByText('Homepage')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
 
-    // Check for images
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(2);
     expect(images[0]).toHaveAttribute('src', 'https://example.com/screenshot1.png');
+    expect(images[0]).toHaveAttribute('alt', 'Homepage screenshot');
+    expect(images[1]).toHaveAttribute('src', 'https://example.com/screenshot2.png');
+    expect(images[1]).toHaveAttribute('alt', 'Dashboard screenshot');
   });
 
   it('handles screenshots API error', async () => {
@@ -103,20 +103,20 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('displays gamification elements', async () => {
+  it('displays gamification elements with correct data', async () => {
     render(<DashboardPage />);
 
-    // Wait for data
     await waitFor(() => {
-      expect(screen.queryAllByText(/Loading/i)).toHaveLength(0);
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
     });
 
-    // Check gamification elements
+    // Verify gamification data is displayed correctly
     expect(screen.getByText('Points')).toBeInTheDocument();
-    expect(screen.getByText('1,250')).toBeInTheDocument(); // 1250 formatted
+    expect(screen.getByText('1,250')).toBeInTheDocument();
     expect(screen.getByText('Level')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('Badges')).toBeInTheDocument();
     expect(screen.getByText('First Commit')).toBeInTheDocument();
+    expect(screen.getByText('Bug Squasher')).toBeInTheDocument();
   });
 });

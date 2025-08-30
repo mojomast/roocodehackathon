@@ -31,22 +31,17 @@ const getBaseUrl = (): string => {
 };
 
 // API request function
-async function apiRequest(endpoint: string, options: any = {}): Promise<any> {
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endpoint}`;
 
   const headers = new Headers({
     'Content-Type': 'application/json',
+    ...options.headers,
   });
 
   if (authToken) {
     headers.set('X-Auth-Token', authToken);
-  }
-
-  if (options.headers) {
-    for (const [key, value] of Object.entries(options.headers)) {
-      headers.set(key, String(value));
-    }
   }
 
   const config: RequestInit = {
@@ -54,8 +49,8 @@ async function apiRequest(endpoint: string, options: any = {}): Promise<any> {
     headers,
   };
 
-  if ((options as any).body && typeof (options as any).body === 'object' && !((options as any).body instanceof FormData)) {
-    (config as any).body = JSON.stringify((options as any).body);
+  if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+    config.body = JSON.stringify(options.body);
   }
 
   try {
@@ -140,14 +135,14 @@ export interface ScreenshotsResponse {
 export const apiClient = {
   // Repository management
   connectRepo: (data: RepoConnectRequest): Promise<RepoConnectResponse> =>
-    apiRequest('/api/repos/connect', { method: 'POST', body: data }),
+    apiRequest('/api/repos/connect', { method: 'POST', body: JSON.stringify(data) }),
 
   getRepos: (): Promise<Repo[]> =>
     apiRequest('/api/repos', { method: 'GET' }),
 
   // Job management
   createJob: (data: JobCreateRequest): Promise<JobCreateResponse> =>
-    apiRequest('/api/docs/run', { method: 'POST', body: data }),
+    apiRequest('/api/docs/run', { method: 'POST', body: JSON.stringify(data) }),
 
   getJobs: (): Promise<Job[]> =>
     apiRequest('/api/jobs', { method: 'GET' }),

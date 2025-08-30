@@ -152,6 +152,15 @@ cd worker
 python -m pytest tests/ -v --cov=. --cov-report=html
 ```
 
+## Architectural Overview
+
+FixMyDocs is composed of three main services:
+- **Frontend**: A Next.js application that provides the user interface.
+- **Backend**: A FastAPI application that provides the API.
+- **Worker**: A Celery application that processes documentation jobs.
+
+These services communicate with each other via a Redis message broker and a PostgreSQL database.
+
 ## Contribution Guidelines
 
 ### Branching Strategy
@@ -407,6 +416,30 @@ All build and configuration files follow project standards:
 - Include table of contents for files longer than 3 sections
 - Use consistent formatting and heading structure
 - Test all code examples before committing
+
+## Database Migrations
+
+This project uses Alembic to manage database migrations. When you make changes to the database models, you will need to create a new migration script.
+
+### Creating a Migration
+
+1.  **Generate a new migration script:**
+    ```bash
+    alembic revision --autogenerate -m "Your migration message"
+    ```
+2.  **Review the generated script:**
+    The script will be created in the `alembic/versions` directory. Review the script to ensure that it accurately reflects your changes.
+3.  **Apply the migration:**
+    ```bash
+    alembic upgrade head
+    ```
+
+### Downgrading a Migration
+
+To downgrade a migration, you can use the `downgrade` command:
+```bash
+alembic downgrade -1
+```
 
 ## Getting Help
 
