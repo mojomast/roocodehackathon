@@ -13,15 +13,45 @@ export class APIError extends Error {
   }
 }
 
-// Auth token management
+// Auth token management with localStorage persistence
+const AUTH_TOKEN_KEY = 'auth_token';
+
 let authToken: string | null = null;
+
+// Initialize token from localStorage
+function initializeAuthToken(): void {
+  if (typeof window !== 'undefined') {
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
+      authToken = storedToken;
+      console.log('Auth token initialized from localStorage');
+    } else {
+      console.log('No auth token found in localStorage');
+    }
+  }
+}
+
+// Call initialization immediately
+initializeAuthToken();
 
 export function setAuthToken(token: string): void {
   authToken = token;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    console.log('Auth token set and persisted to localStorage');
+  }
 }
 
 export function clearAuthToken(): void {
   authToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    console.log('Auth token cleared from memory and localStorage');
+  }
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
 }
 
 // Base URL configuration - server/client aware
@@ -42,6 +72,9 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
   if (authToken) {
     headers.set('X-Auth-Token', authToken);
+    console.log('API Request: including X-Auth-Token header');
+  } else {
+    console.warn('API Request: no auth token available');
   }
 
   const config: RequestInit = {

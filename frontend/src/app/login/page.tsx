@@ -8,11 +8,24 @@ import { useSearchParams } from 'next/navigation';
 const validateRedirectURL = (url: string | null): string | null => {
   if (!url) return null;
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && !parsed.host.includes('localhost')) return null; // Allow http for localhost in dev
-    const allowedDomains = ['localhost:3000', 'fixmydocs.com']; // Allowlist of safe domains
-    if (!allowedDomains.some(domain => parsed.host.includes(domain))) return null;
-    return decodeURIComponent(url); // Already encoded, but we trust it's safe now
+    // Sanitize URL by decoding it first to handle double-encoding attacks
+    const decodedUrl = decodeURIComponent(url);
+    const parsed = new URL(decodedUrl, window.location.origin); // Resolve relative URLs against origin
+
+    // Allow only relative URLs or absolute URLs from a strict allowlist
+    const allowedHosts = [window.location.host, "fixmydocs.com"];
+    if (parsed.host && !allowedHosts.includes(parsed.host)) {
+        return null;
+    }
+    
+    // Prevent protocol-relative URL attacks and ensure it's a safe protocol
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return null;
+    }
+
+    // Return a safe, relative path
+    return parsed.pathname + parsed.search + parsed.hash;
+
   } catch {
     return null;
   }
@@ -35,7 +48,7 @@ const LoginPageContent: React.FC = () => {
 
   // Memoize the login handler to stable reference
   const handleLogin = useCallback(() => {
-    const baseUrl = '/api/auth/github';
+    const baseUrl = 'http://localhost:8000/api/auth/github';
     const url = safeRedirect
       ? `${baseUrl}?redirect=${encodeURIComponent(safeRedirect)}`
       : baseUrl;

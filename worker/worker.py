@@ -1,8 +1,55 @@
 import os
 import logging
 import re
+import platform
+import psutil
 from typing import Optional
 from urllib.parse import urlparse, parse_qs
+from dotenv import load_dotenv
+load_dotenv()
+
+# Diagnostic logging for environment and system info
+def log_system_info():
+    """Log comprehensive system and environment information for debugging."""
+    logging.info(f"DEBUG-001: Operating System: {platform.system()} {platform.release()} ({platform.version()})")
+    logging.info(f"DEBUG-001: Platform: {platform.platform()}")
+    logging.info(f"DEBUG-001: Python Version: {platform.python_version()}")
+    try:
+        import sys
+        logging.info(f"DEBUG-001: Python Executable: {sys.executable}")
+    except Exception as e:
+        logging.info(f"DEBUG-001: Python Executable: Unable to determine ({e})")
+    logging.info(f"DEBUG-001: Current Working Directory: {os.getcwd()}")
+    logging.info(f"DEBUG-001: Process ID: {os.getpid()}")
+    logging.info(f"DEBUG-001: Parent Process ID: {os.getppid() if hasattr(os, 'getppid') else 'N/A'}")
+
+    # Check multiprocessing capabilities and permissions
+    try:
+        import multiprocessing
+        logging.info(f"DEBUG-001: Multiprocessing CPU Count: {multiprocessing.cpu_count()}")
+        logging.info(f"DEBUG-001: Multiprocessing Context: {multiprocessing.get_context()}")
+
+        # Check if we can create multiprocessing handles
+        try:
+            from multiprocessing import Lock
+            lock = Lock()
+            lock.acquire()
+            lock.release()
+            logging.info("DEBUG-001: Multiprocessing Lock creation: SUCCESS")
+        except Exception as e:
+            logging.error(f"DEBUG-001: Multiprocessing Lock creation failed: {e}")
+
+    except Exception as e:
+        logging.error(f"DEBUG-001: Multiprocessing module error: {e}")
+
+    # Check psutil for resource information
+    try:
+        import psutil
+        process = psutil.Process()
+        logging.info(f"DEBUG-001: Current Process Memory Usage: {process.memory_info().rss / 1024 / 1024:.1f} MB")
+        logging.info(f"DEBUG-001: Current Process CPU Usage: {process.cpu_percent()}%")
+    except Exception as e:
+        logging.error(f"DEBUG-001: Process information unavailable: {e}")
 
 # WK-009: Enhanced imports for database validation, secrets management, and security
 from cryptography.fernet import Fernet, InvalidToken
@@ -20,14 +67,67 @@ from worker.patcher import Patcher
 from worker.logger import Logger
 from worker.config import Config
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging with more verbose level for debugging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Celery configuration
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+# Log system information at startup
+log_system_info()
 
-app = Celery('worker', broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
+# Celery configuration with enhanced debugging
+BROKER_URL_ENV = os.getenv('CELERY_BROKER_URL')
+BACKEND_URL_ENV = os.getenv('CELERY_RESULT_BACKEND')
+
+logging.info(f"DEBUG-002: CELERY_BROKER_URL env var: {BROKER_URL_ENV}")
+logging.info(f"DEBUG-002: CELERY_RESULT_BACKEND env var: {BACKEND_URL_ENV}")
+
+# Updated defaults to use localhost for better local development compatibility
+CELERY_BROKER_URL = BROKER_URL_ENV if BROKER_URL_ENV else 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = BACKEND_URL_ENV if BACKEND_URL_ENV else 'redis://localhost:6379/0'
+
+logging.info(f"DEBUG-002: Final CELERY_BROKER_URL: {CELERY_BROKER_URL}")
+logging.info(f"DEBUG-002: Final CELERY_RESULT_BACKEND: {CELERY_RESULT_BACKEND}")
+
+# Test Redis connection before creating Celery app
+try:
+    import redis
+    parsed = urlparse(CELERY_BROKER_URL)
+    redis_client = redis.Redis(
+        host=parsed.hostname,
+        port=parsed.port or 6379,
+        db=int(parsed.path.lstrip('/')) if parsed.path else 0,
+        decode_responses=True
+    )
+    # Test connection
+    redis_client.ping()
+    logging.info("DEBUG-002: Redis connection test: SUCCESS")
+except Exception as e:
+    logging.error(f"DEBUG-002: Redis connection test FAILED: {e}")
+    logging.error("DEBUG-002: This may cause Celery worker initialization failures")
+
+# Configure Celery with Windows-specific settings if needed
+app = Celery(
+    'worker',
+    broker=CELERY_BROKER_URL,
+    backend=CELERY_RESULT_BACKEND
+)
+
+# Add Windows-specific configuration if running on Windows
+if platform.system() == 'Windows':
+    logging.info("DEBUG-002: Applying Windows-specific Celery configuration")
+
+    # Disable billiard multiprocessing on Windows to use forkserver
+    app.conf.update(
+        worker_pool='solo',  # Use solo pool instead of prefork on Windows
+        task_always_eager=False,  # Allow async task execution
+        worker_prefetch_multiplier=1,  # Reduce prefetch to avoid handle exhaustion
+        worker_max_tasks_per_child=1,  # Restart worker after each task to avoid handle leaks
+        result_expires=3600,  # 1 hour result expiry
+        task_acks_late=True,  # Acknowledge tasks after completion
+        worker_disable_rate_limits=False,
+    )
+    logging.info("DEBUG-002: Windows configuration applied: worker_pool=solo, prefetch_multiplier=1")
+else:
+    logging.info("DEBUG-002: Using default Celery configuration for non-Windows platform")
 
 # WK-009: Enhanced database configuration with proper secrets management, input sanitization, and error handling
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -204,14 +304,23 @@ except Exception as e:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@app.task
-def process_documentation_job(job_id: int):
+@app.task(bind=True)
+def process_documentation_job(self, job_id: int):
     """
     WK-014: Placeholder task for processing documentation jobs with proper transaction handling.
     In a real scenario, this would handle the logic for generating documentation.
     Uses SQLAlchemy's transaction context manager for automatic commit/rollback.
+
+    Added bind=True for task instance access and enhanced logging for debugging.
     """
-    logging.info(f"Processing documentation job: {job_id}")
+    try:
+        logging.info(f"DEBUG-003: Received Celery task for job_id: {job_id}")
+        logging.info(f"DEBUG-003: Task ID: {self.request.id}")
+        logging.info(f"DEBUG-003: Worker hostname: {self.request.hostname}")
+        logging.info(f"DEBUG-003: Task arguments: {self.request.args}")
+        logging.info(f"DEBUG-003: Processing documentation job: {job_id}")
+    except Exception as e:
+        logging.error(f"DEBUG-003: Error accessing task metadata: {e}, continuing with job processing")
 
     db = SessionLocal()
     try:

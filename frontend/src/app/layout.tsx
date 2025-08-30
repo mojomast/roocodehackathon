@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: "Documentation generation and GitHub integration platform",
   // CSP headers prevent XSS attacks
   other: {
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self';",
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",

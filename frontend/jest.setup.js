@@ -1,4 +1,8 @@
+import 'whatwg-fetch';
 import '@testing-library/jest-dom';
+import { TextEncoder, TextDecoder } from 'util';
+
+Object.assign(global, { TextDecoder, TextEncoder });
 
 // Import fetch polyfill for jsdom environment
 import 'jest-fetch-mock';

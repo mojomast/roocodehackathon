@@ -12,7 +12,10 @@ Usage: python migrate.py
 """
 
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def run_migration():
     # Use the same DATABASE_URL as in models.py
@@ -27,30 +30,30 @@ def run_migration():
         # Add new columns to jobs table
         # Note: Using CHECK constraint for progress not enforced in SQLite, but ok for PostgreSQL
 
-        conn.execute("""
+        conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN clone_path VARCHAR(500);
-        """)
+        """))
 
-        conn.execute("""
+        conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN progress INTEGER DEFAULT 0;
-        """)
+        """))
 
-        conn.execute("""
+        conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN error_message TEXT;
-        """)
+        """))
 
-        conn.execute("""
+        conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN retry_count INTEGER DEFAULT 0;
-        """)
+        """))
 
         # Update existing records to have default progress if needed
-        conn.execute("""
+        conn.execute(text("""
             UPDATE jobs SET progress = 0 WHERE progress IS NULL;
-        """)
+        """))
 
-        conn.execute("""
+        conn.execute(text("""
             UPDATE jobs SET retry_count = 0 WHERE retry_count IS NULL;
-        """)
+        """))
 
         # For PostgreSQL, this might be needed, but in SQLite it's fine
         # conn.commit() if using raw conn

@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -9,6 +10,7 @@ from enum import Enum
 Base = declarative_base()
 
 # Database URL from environment variable
+load_dotenv(dotenv_path="backend/.env")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Validate DATABASE_URL - BE-001: Ensure it's not None or empty

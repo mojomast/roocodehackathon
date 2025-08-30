@@ -1,0 +1,7 @@
+# Ignore environment variable files
+.env
+.env.*
+backend/.env
+backend/.env.*
+worker/.env
+worker/.env.*

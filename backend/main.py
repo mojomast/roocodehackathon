@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Lifespan, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
@@ -6,6 +6,7 @@ from typing import Dict, Annotated
 from pydantic import BaseModel # Import BaseModel
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Header, Security
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 import httpx # Import httpx for making HTTP requests
 from contextlib import asynccontextmanager
@@ -33,6 +34,15 @@ app = FastAPI(
     description="Backend API for FixMyDocs, handling documentation generation and GitHub integration.",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Allow frontend development ports
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Database tables are now created via lifespan event handler above
@@ -175,8 +185,11 @@ async def github_callback(code: str, db: Session = Depends(get_db)): # This rout
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error during user creation/update: {str(e)}")
 
-    # Redirect to frontend dashboard
-    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+    # For development, redirect to frontend with the auth token
+    # In production, implement secure token handling
+    frontend_url = "http://localhost:3001" if "localhost:3001" in os.getenv("GITHUB_CALLBACK_URL", "") else "http://localhost:3000"
+    dashboard_url = f"{frontend_url}/dashboard?token={access_token}"
+    return RedirectResponse(url=dashboard_url, status_code=status.HTTP_302_FOUND)
 
 class RepoConnectRequest(BaseModel):
     repo_url: str
@@ -196,14 +209,26 @@ async def connect_repository(request: RepoConnectRequest, user: User = Depends(v
 
     return {"message": f"Repository {request.repo_name} connected successfully", "repo_id": new_repo.id}
 
-# Placeholder for Celery task dispatch
-# In a real scenario, you would import and call the Celery task here
+# Celery integration
+try:
+    from worker.worker import process_documentation_job as celery_process_documentation_job
+    CELERY_INTEGRATION_ENABLED = True
+except ImportError as e:
+    print(f"Warning: Celery integration unavailable: {e}")
+    CELERY_INTEGRATION_ENABLED = False
+
 def process_documentation_job(job_id: int):
     """
-    Placeholder function to simulate dispatching a job to Celery worker.
+    Dispatch documentation job to Celery worker.
     """
-    print(f"Dispatching job {job_id} to Celery worker...")
-    # TODO: Integrate with actual Celery task: process_documentation_job.delay(job_id)
+    if CELERY_INTEGRATION_ENABLED:
+        print(f"Dispatching job {job_id} to Celery worker...")
+        result = celery_process_documentation_job.delay(job_id)
+        print(f"Celery task dispatched with ID: {result.id}")
+        return {"status": "dispatched", "task_id": result.id}
+    else:
+        print(f"Warning: Celery not available, simulating dispatch for job {job_id}")
+        return {"status": "simulated", "task_id": None}
 
 class JobCreateRequest(BaseModel):
     repo_id: int
@@ -404,6 +429,35 @@ async def list_repositories(user: User = Depends(verify_auth_token), db: Session
         }
         for r in repos
     ]
+
+@app.get("/api/dashboard/stats", dependencies=[Depends(verify_auth_token)])
+async def get_dashboard_stats(user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Returns dashboard statistics for the authenticated user.
+    """
+    total_repos = db.query(Repo).filter(Repo.user_id == user.id).count()
+    total_jobs = db.query(Job).join(Repo, Repo.id == Job.repo_id).filter(Repo.user_id == user.id).count()
+    active_jobs = db.query(Job).join(Repo, Repo.id == Job.repo_id).filter(
+        Repo.user_id == user.id,
+        Job.status.in_(["pending", "running"])
+    ).count()
+
+    return {
+        "totalRepos": total_repos,
+        "totalJobs": total_jobs,
+        "activeJobs": active_jobs,
+    }
+
+@app.get("/api/screenshots", dependencies=[Depends(verify_auth_token)])
+async def get_screenshots(user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Returns recent screenshots for the authenticated user.
+    """
+    # For now, return an empty list since we're not storing screenshots yet
+    # In a real implementation, this would query for recent screenshots
+    return {
+        "screenshots": []
+    }
 
 @app.post("/api/github/webhook")
 async def github_webhook(request: Request):

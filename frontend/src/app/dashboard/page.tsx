@@ -1,8 +1,9 @@
 "use client";
 // frontend/src/app/dashboard/page.tsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { apiClient, APIError } from '../../utils/apiClient';
+import { apiClient, APIError, setAuthToken, getAuthToken } from '../../utils/apiClient';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
@@ -24,10 +25,23 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
  * Includes placeholder content for welcome message and gamification elements.
  */
 const DashboardPageContent: React.FC = () => {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalRepos, setTotalRepos] = useState<number | null>(null);
   const [completedJobs, setCompletedJobs] = useState<number | null>(null);
+
+  // Handle auth token from OAuth redirect
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token) {
+      setAuthToken(token);
+      // Clean up URL by removing token parameter
+      const url = new URL(window.location.href);
+      url.searchParams.delete('token');
+      window.history.replaceState({}, document.title, url.pathname + url.search);
+    }
+  }, [searchParams]);
 
   // FE-004: Screenshots component state and loading
   const [screenshots, setScreenshots] = useState<{ url: string; description: string }[]>([]);
@@ -88,13 +102,44 @@ const DashboardPageContent: React.FC = () => {
     { name: 'Code Master', icon: '🏆' },
   ];
 
+  // Debug component for token status
+  const TokenStatusDebug = () => {
+    const [currentToken, setCurrentToken] = useState<string | null>(null);
+
+    useEffect(() => {
+      setCurrentToken(getAuthToken());
+      const checkToken = setInterval(() => {
+        setCurrentToken(getAuthToken());
+      }, 1000);
+      return () => clearInterval(checkToken);
+    }, []);
+
+    if (process.env.NODE_ENV === 'production') return null;
+
+    return (
+      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded text-sm">
+        <strong>Debug Token Status:</strong>
+        <span className={currentToken ? "text-green-600" : "text-red-600"}>
+          {currentToken ? " Token Present" : " No Token"}
+        </span>
+        <br />
+        <small>Check console for detailed logging</small>
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-gray-100 p-8" role="main">
-      <header className="mb-8">
+      <header className="mb-8 flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Welcome to the Dashboard!</h1>
+        <a href="http://localhost:8000/api/auth/github" className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Login with GitHub
+        </a>
+        <TokenStatusDebug />
       </header>
 
       {/* Gamification Elements */}
+      {/*
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" aria-labelledby="gamification-heading">
         <h2 id="gamification-heading" className="sr-only">Gamification Stats</h2>
         <div className="bg-white p-6 rounded-lg shadow-md" aria-label={`Points: ${points.toLocaleString()}`}>
@@ -117,6 +162,7 @@ const DashboardPageContent: React.FC = () => {
           </div>
         </div>
       </section>
+      */}
 
       {/* Summary Data */}
       <section className="bg-white p-8 rounded-lg shadow-md mb-8" aria-labelledby="summary-heading">
@@ -140,6 +186,7 @@ const DashboardPageContent: React.FC = () => {
       {/* FE-004: Screenshots component with loading states and error handling */}
       <section className="bg-white p-8 rounded-lg shadow-md" aria-labelledby="screenshots-heading">
         <h2 id="screenshots-heading" className="text-2xl font-semibold text-gray-700 mb-4">Recent Screenshots</h2>
+        <ErrorBoundary>
         {loadingScreenshots && <LoadingSpinner />}
         {errorScreenshots && <ErrorMessage message={`Failed to load screenshots: ${errorScreenshots}`} />}
         {!loadingScreenshots && !errorScreenshots && screenshots.length > 0 && (
@@ -155,6 +202,7 @@ const DashboardPageContent: React.FC = () => {
         {!loadingScreenshots && !errorScreenshots && screenshots.length === 0 && (
           <p className="text-gray-600">No recent screenshots to display.</p>
         )}
+        </ErrorBoundary>
       </section>
     </main>
   );
