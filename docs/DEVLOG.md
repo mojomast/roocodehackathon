@@ -1,5 +1,25 @@
 # Devlog
 
+## [2025-08-30] - Testing Build 2: Enhanced Dev Experience and Frontend Polish
+
+- **Milestone Achievement**: Pushed "testing build 2" which includes significant improvements to the development and testing workflow, along with major frontend enhancements.
+- **Backend Improvements**:
+  - Added CORS middleware to allow the frontend to communicate with the backend in development.
+  - Integrated Celery for asynchronous task processing.
+  - Added new API endpoints for dashboard statistics (`/api/dashboard/stats`).
+  - Updated the GitHub OAuth callback to pass the auth token to the frontend via URL parameters.
+  - Introduced new scripts (`create_test_user.py`, `test_docs_run.py`) to simplify E2E testing.
+- **Worker Improvements**:
+  - Added comprehensive system and environment logging for easier debugging.
+  - Implemented Windows-specific configurations for Celery to improve local development reliability.
+  - Added Redis connection testing at startup.
+- **Frontend Improvements**:
+  - Overhauled the testing setup with updated Jest configuration and polyfills.
+  - Implemented persistent authentication by storing the auth token in `localStorage`.
+  - Improved the UI for the error boundary component.
+  - Refactored and simplified security tests.
+  - Updated the dashboard and login pages to align with the new authentication flow.
+
 ## [2025-08-29 23:59] - Codebase Analysis Milestone: Comprehensive Findings Documented
 
 **Milestone Achievement**: Completed detailed analysis of security, bugs, performance, and documentation across all components (backend, frontend, worker, infrastructure, testing). All findings documented with resolutions applied in previous milestones; no new code changes implemented.

@@ -20,8 +20,9 @@ All API requests require authentication using GitHub OAuth2. The application use
 ### OAuth Flow
 
 1. `GET /auth/github` - Redirects to GitHub OAuth authorization
-2. `GET /auth/github/callback` - Handles OAuth callback and creates user session
-3. User session maintained via HTTP cookies
+2. `GET /auth/github/callback` - Handles OAuth callback, creates a user session, and redirects to the frontend dashboard with an auth token in the URL parameters (`/dashboard?token=...`).
+3. The frontend application is responsible for extracting the token and storing it for subsequent API requests.
+4. Authenticated requests must include the token in the `X-Auth-Token` header.
 
 ## Core Endpoints
 
@@ -225,6 +226,34 @@ Lightweight endpoint for polling job status.
 
 **Error Responses:**
 - `404 Not Found` - Job not found
+
+### Dashboard
+
+#### Get Dashboard Stats
+**GET** `/api/dashboard/stats`
+
+Returns dashboard statistics for the authenticated user.
+
+**Response (200):**
+```json
+{
+  "totalRepos": 5,
+  "totalJobs": 23,
+  "activeJobs": 2
+}
+```
+
+#### Get Screenshots
+**GET** `/api/screenshots`
+
+Returns recent screenshots for the authenticated user.
+
+**Response (200):**
+```json
+{
+  "screenshots": []
+}
+```
 
 ### User Management
 
