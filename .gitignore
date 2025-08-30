@@ -1,0 +1,32 @@
+# Dependencies
+/node_modules
+/backend/venv
+/worker/venv
+
+# Environment variables
+.env
+.env*.local
+backend/.env
+frontend/.env
+worker/.env
+
+# Next.js
+/.next/
+/out/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Docker
+docker-compose.override.yml
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db

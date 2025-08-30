@@ -1,0 +1,29 @@
+# WK-016 & WK-021: Comprehensive dependency management for worker service
+# All third-party packages pinned to specific version ranges to prevent vulnerabilities
+# from unpinned dependencies. Ranges chosen for compatibility and security patches.
+# Bootstrapped security checks and input sanitization.
+celery>=5.2.0,<6.0.0
+redis>=3.5.0,<5.0.0
+SQLAlchemy>=1.4.0,<3.0.0
+psycopg2-binary>=2.8.0,<3.0.0
+pytest>=6.2.0,<8.0.0
+httpx>=0.20.0,<0.26.0
+GitPython>=3.1.0,<4.0.0
+PyGitHub>=1.54.0,<2.0.0
+cryptography>=3.4.0,<42.0.0
+validators>=0.18.0,<1.0.0
+
+# Standard Library Dependencies (included in Python):
+# - ast: Abstract Syntax Tree parsing for code analysis
+# - os: Operating system interface and file operations
+# - logging: Logging framework for application monitoring
+# - datetime, time: Date and time handling
+# - re: Regular expression operations for text processing
+# - typing: Type hints and annotations
+# - urllib.parse: URL parsing and validation
+
+# Environment Requirements:
+# - Python >= 3.8, < 4.0
+# - PostgreSQL >= 10.0
+# - Redis >= 5.0
+# - Docker >= 20.10 (for containerized deployment)
