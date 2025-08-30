@@ -46,15 +46,21 @@ async def verify_auth_token(x_auth_token: Annotated[str | None, Header()] = None
     Looks up the access_token in the User table. If not found, returns 401 Unauthorized.
     Returns the authenticated User object on success.
     """
-    if x_auth_token is None:
-        raise HTTPException(status_code=401, detail="Unauthorized: X-Auth-Token header missing")
+    if not x_auth_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized: X-Auth-Token header missing")
 
-    # Validate token against database
-    user = db.query(User).filter(User.access_token == x_auth_token).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized: Invalid access token")
+    try:
+        user = db.query(User).filter(User.access_token == x_auth_token).one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized: Invalid access token")
+        
+        # Optional: Check for token expiration if you add an expiry date to the user model
+        # if user.token_expires_at and user.token_expires_at < datetime.now(timezone.utc):
+        #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized: Token has expired")
 
-    return user
+        return user
+    except SQLAlchemyError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error during token validation")
 
 @app.get("/")
 def read_root():
@@ -404,18 +410,19 @@ async def github_webhook(request: Request):
     """
     GitHub webhook endpoint with HMAC SHA256 signature verification.
     """
-    secret = os.getenv("GITHUB_WEBHOOK_SECRET")
-    if not secret:
-        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    webhook_secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+    if not webhook_secret:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook secret not configured")
 
     raw_body = await request.body()
-    sig_header = request.headers.get("X-Hub-Signature-256", "")
-    event_type = request.headers.get("X-GitHub-Event", "unknown")
+    signature_header = request.headers.get("X-Hub-Signature-256")
+    if not signature_header:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="X-Hub-Signature-256 header is missing")
 
-    mac = hmac.new(secret.encode(), msg=raw_body, digestmod=hashlib.sha256)
-    expected_sig = f"sha256={mac.hexdigest()}"
-    if not hmac.compare_digest(expected_sig, sig_header):
-        raise HTTPException(status_code=401, detail="Invalid signature")
+    expected_signature = f"sha256={hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()}"
+
+    if not hmac.compare_digest(expected_signature, signature_header):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
     payload = await request.json()
     result = await github_app_handle_webhook(payload, dict(request.headers))
