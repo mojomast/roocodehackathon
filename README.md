@@ -146,3 +146,32 @@ Local test (example):
 echo -n '{"zen":"Keep it logically awesome."}' > payload.json
 # Compute HMAC using your secret and send with header (pseudo, compute signature in your tool)
 ```
+
+## Note for the Team
+
+Hey everyone,
+
+I've gotten the application to a stable state where the frontend, backend, and worker services are all running and communicating correctly. The recent CORS and database migration issues have been resolved.
+
+I have to head out to jam with my band, but I wanted to leave some notes on where I left off and what's next. Please keep hacking on this!
+
+**Where I left off:**
+*   The application is fully running. You can access the frontend at `http://localhost:3000`.
+*   The database migration race condition has been fixed by ensuring transactions are committed in the `backend/migrate.py` script.
+
+**What's left to do:**
+*   Please refer to the `IMPROVEMENT_BACKLOG.md` for the next steps. The key items are:
+    *   Job cancellation and idempotency
+    *   Unify Job schema across backend and worker
+    *   Robust OAuth state/PKCE and session separation from GitHub token
+    *   Error reporting and traceability
+    *   Rate limiting and basic abuse protection
+    *   Parser hardening for non-Python repos
+    *   Frontend performance and config cleanup
+    *   Accessibility and SEO improvements
+    *   Developer experience enhancements
+    *   Documentation accuracy updates
+    *   Health checks for all services and graceful shutdown for worker
+    *   Observability: request/job metrics and traces; error budgets
+    *   CI: run linters, type-checkers, unit/integration tests; artifact build
+    *   Containers: resource caps and minimal images
