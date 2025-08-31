@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { server } from '../../mocks/server';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import DOMPurify from 'dompurify';
 
 // Component that intentionally creates XSS vulnerability for testing
@@ -87,12 +87,12 @@ describe('Security Tests', () => {
     it('prevents direct API access without authentication tokens', () => {
       // Mock unauthenticated API request
       server.use(
-        rest.get('/api/protected/data', (req, res, ctx) => {
-          const authHeader = req.headers.get('Authorization');
+        http.get('/api/protected/data', ({ request }) => {
+          const authHeader = request.headers.get('Authorization');
           if (!authHeader) {
-            return res(ctx.status(401), ctx.json({ error: 'Unauthorized' }));
+            return new HttpResponse(null, { status: 401 });
           }
-          return res(ctx.json({ data: 'protected content' }));
+          return HttpResponse.json({ data: 'protected content' });
         })
       );
 
@@ -212,12 +212,12 @@ describe('Security Tests', () => {
     it('validates CSRF tokens in state-changing requests', () => {
       // Mock POST request without CSRF token
       server.use(
-        rest.post('/api/state-changing-endpoint', (req, res, ctx) => {
-          const csrfToken = req.headers.get('X-CSRF-Token');
+        http.post('/api/state-changing-endpoint', ({ request }) => {
+          const csrfToken = request.headers.get('X-CSRF-Token');
           if (!csrfToken) {
-            return res(ctx.status(403), ctx.json({ error: 'CSRF token missing' }));
+            return new HttpResponse(null, { status: 403 });
           }
-          return res(ctx.json({ success: true }));
+          return HttpResponse.json({ success: true });
         })
       );
 
@@ -230,12 +230,13 @@ describe('Security Tests', () => {
     it('enforces rate limits on authentication endpoints', () => {
       // Mock rate-limited response
       server.use(
-        rest.post('/api/auth/login', (req, res, ctx) => {
-          return res(
-            ctx.status(429),
-            ctx.json({ error: 'Too many requests' }),
-            ctx.set('Retry-After', '60')
-          );
+        http.post('/api/auth/login', () => {
+          return new HttpResponse(null, {
+            status: 429,
+            headers: {
+              'Retry-After': '60',
+            },
+          });
         })
       );
 

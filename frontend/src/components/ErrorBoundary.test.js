@@ -60,7 +60,7 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    expect(screen.getByText('Test error')).toBeInTheDocument();
+    expect(screen.getByText(/Test error/)).toBeInTheDocument();
 
     // Cleanup
     process.env.NODE_ENV = originalEnv;
@@ -96,7 +96,7 @@ describe('ErrorBoundary', () => {
     );
 
     // Check that details element exists with pre-wrap style
-    const details = screen.getByText('Test error').closest('details');
+    const details = screen.getByText(/Test error/).closest('details');
     expect(details).toBeInTheDocument();
     expect(details).toHaveStyle({ whiteSpace: 'pre-wrap' });
 

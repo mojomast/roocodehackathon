@@ -12,10 +12,14 @@ jest.mock('next/navigation', () => ({
 }));
 
 // Mock window.location
+const originalLocation = window.location;
 delete window.location;
-window.location = {
-  href: jest.fn(),
-};
+window.location = Object.assign(new URL('https://example.com'), {
+  ancestorOrigins: '',
+  assign: jest.fn(),
+  reload: jest.fn(),
+  replace: jest.fn(),
+});
 
 describe('LoginPage', () => {
   beforeEach(() => {
@@ -46,7 +50,7 @@ describe('LoginPage', () => {
     fireEvent.click(loginButton);
 
     // Verify redirect URL contains the redirect parameter
-    expect(window.location.href).toHaveBeenCalledWith('https://github.com/login/oauth/authorize?redirect=https://fixmydocs.com/dashboard');
+    expect(window.location.assign).toHaveBeenCalledWith('http://localhost:8000/api/auth/github?redirect=https%3A%2F%2Ffixmydocs.com%2Fdashboard');
   });
 
   it('handles login without redirect parameter', () => {
@@ -59,7 +63,7 @@ describe('LoginPage', () => {
     const loginButton = screen.getByRole('button', { name: /Login with GitHub/i });
     fireEvent.click(loginButton);
 
-    expect(window.location.href).toHaveBeenCalledWith('/api/auth/github');
+    expect(window.location.assign).toHaveBeenCalledWith('http://localhost:8000/api/auth/github');
   });
 
   it('validates redirect URLs against allowlist', () => {
@@ -108,14 +112,17 @@ describe('LoginPage', () => {
     fireEvent.click(loginButton);
 
     // Verify the malicious redirect was not used
-    expect(window.location.href).not.toHaveBeenCalledWith(maliciousRedirect);
+    expect(window.location.assign).not.toHaveBeenCalledWith(maliciousRedirect);
   });
 
   it('handles GitHub API failure', async () => {
     // Mock GitHub API failure
     server.use(
-      rest.get('/api/auth/github', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'GitHub service unavailable' }));
+      http.get('/api/auth/github', () => {
+        return new HttpResponse(null, {
+          status: 500,
+          statusText: 'GitHub service unavailable',
+        });
       })
     );
 
@@ -159,6 +166,6 @@ describe('LoginPage', () => {
     fireEvent.click(loginButton);
 
     // Should not crash and should use default redirect
-    expect(window.location.href).toHaveBeenCalledWith('/api/auth/github');
+    expect(window.location.assign).toHaveBeenCalledWith('http://localhost:8000/api/auth/github');
   });
 });

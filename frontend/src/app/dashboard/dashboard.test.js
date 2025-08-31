@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { server } from '../../mocks/server';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import DashboardPage from './page';
 
 describe('DashboardPage', () => {
   it('renders a heading', () => {
     render(<DashboardPage />);
-    const heading = screen.getByRole('heading', { name: /Welcome to the Dashboard!/i });
+    const heading = screen.getByRole('heading', { name: /Hack the Planet!/i });
     expect(heading).toBeInTheDocument();
   });
 
@@ -15,7 +15,7 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
 
     // Check for loading spinner (animate-spin class)
-    const loadingElements = screen.getAllByText(/Loading/i);
+    const loadingElements = screen.getAllByLabelText(/Loading content/i);
     expect(loadingElements.length).toBeGreaterThan(0);
   });
 
@@ -23,11 +23,11 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Loading content/i)).not.toBeInTheDocument();
     });
 
     // Verify specific stats are displayed correctly
-    expect(screen.getByText('Connected Repositories')).toBeInTheDocument();
+    expect(screen.getByText('Total Repos')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('Completed Jobs')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
@@ -36,8 +36,11 @@ describe('DashboardPage', () => {
   it('handles API error for dashboard stats', async () => {
     // Mock API failure
     server.use(
-      rest.get('/api/dashboard/stats', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'Internal server error' }));
+      http.get('/api/dashboard/stats', () => {
+        return new HttpResponse(null, {
+          status: 500,
+          statusText: 'Internal server error',
+        });
       })
     );
 
@@ -45,11 +48,11 @@ describe('DashboardPage', () => {
 
     // Wait for error to appear
     await waitFor(() => {
-      expect(screen.getByText(/HTTP error! status: 500/i)).toBeInTheDocument();
+      expect(screen.getByText(/Error fetching dashboard stats/i)).toBeInTheDocument();
     });
 
     // Ensure stats are not shown when there's an error
-    expect(screen.queryByText('Connected Repositories')).not.toBeInTheDocument();
+    expect(screen.queryByText('Total Repos')).not.toBeInTheDocument();
   });
 
   it('displays screenshots with correct alt text and sources', async () => {
@@ -74,8 +77,11 @@ describe('DashboardPage', () => {
   it('handles screenshots API error', async () => {
     // Mock screenshots API failure
     server.use(
-      rest.get('/api/screenshots', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'Failed to load screenshots' }));
+      http.get('/api/screenshots', () => {
+        return new HttpResponse(null, {
+          status: 500,
+          statusText: 'Failed to load screenshots',
+        });
       })
     );
 
@@ -83,15 +89,15 @@ describe('DashboardPage', () => {
 
     // Wait for error message
     await waitFor(() => {
-      expect(screen.getByText(/Failed to load screenshots: HTTP error! status: 500/i)).toBeInTheDocument();
+      expect(screen.getByText(/Error fetching screenshots/i)).toBeInTheDocument();
     });
   });
 
   it('shows no screenshots message when empty', async () => {
     // Mock empty screenshots response
     server.use(
-      rest.get('/api/screenshots', (req, res, ctx) => {
-        return res(ctx.json({ screenshots: [] }));
+      http.get('/api/screenshots', () => {
+        return HttpResponse.json({ screenshots: [] });
       })
     );
 
@@ -99,7 +105,7 @@ describe('DashboardPage', () => {
 
     // Wait for "no screenshots" message
     await waitFor(() => {
-      expect(screen.getByText('No recent screenshots to display.')).toBeInTheDocument();
+      expect(screen.getByText('No screenshots available.')).toBeInTheDocument();
     });
   });
 
@@ -112,7 +118,7 @@ describe('DashboardPage', () => {
 
     // Verify gamification data is displayed correctly
     expect(screen.getByText('Points')).toBeInTheDocument();
-    expect(screen.getByText('1,250')).toBeInTheDocument();
+    expect(screen.getByText('1250')).toBeInTheDocument();
     expect(screen.getByText('Level')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('Badges')).toBeInTheDocument();

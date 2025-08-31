@@ -1,78 +1,183 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Define root variables first for proper inheritance */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --background: #0A0A0A;
+  --primary-accent: #9400FF;
+  --secondary-accent: #00BFFF;
+  --tertiary-accent: #39FF14;
+  --panel-background: #141414;
+  --borders-dividers: #2E2E2E;
+  --primary-text: #EAEAEA;
+  --headings: #FFFFFF;
 
-/* Theme configuration with proper specificity */
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-}
-
-/* Shared CSS variables for theme consistency */
-.theme-light {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-.theme-dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-}
-
-/* Base typography with proper specificity hierarchy */
-html {
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-heading: 'Orbitron', sans-serif;
+  --font-body: 'Exo 2', sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: var(--background);
+  color: var(--primary-text);
+  font-family: var(--font-body);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Media queries should come after base styles */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--headings);
 }
 
-/* Additional global styles with proper specificity */
+a {
+  color: var(--primary-accent);
+  text-decoration: none;
+  transition: color 0.2s ease-out, text-shadow 0.2s ease-out;
+}
+
+a:hover {
+  color: var(--secondary-accent);
+  text-shadow: 0 0 8px var(--secondary-accent);
+}
+
+button, .button {
+  background-color: var(--primary-accent);
+  color: var(--headings);
+  font-family: var(--font-heading);
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out;
+  box-shadow: 0 0 0 rgba(148, 0, 255, 0);
+}
+
+button:hover, .button:hover {
+  background-color: #A42EFF;
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(148, 0, 255, 0.8);
+}
+
+.panel, .card {
+  background-color: var(--panel-background);
+  border: 1px solid var(--borders-dividers);
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.2s ease-out;
+}
+
+.panel:hover, .card:hover {
+  box-shadow: 0 0 20px rgba(0, 191, 255, 0.5), 0 0 30px rgba(148, 0, 255, 0.3);
+}
+
+input, textarea, select {
+  background-color: var(--panel-background);
+  border: 1px solid var(--borders-dividers);
+  color: var(--primary-text);
+  padding: 10px;
+  border-radius: 4px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--secondary-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 10px var(--secondary-accent), inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
 * {
   box-sizing: border-box;
 }
 
-/* Focus states for better accessibility */
-button:focus,
-a:focus,
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* Ensure smooth scrolling on iOS */
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-/* Reset default margins for better consistency */
 h1, h2, h3, h4, h5, h6, p {
   margin: 0;
 }
 
-/* Better font rendering */
-body, button, input, select, textarea {
-  font-family: inherit;
+.btn-cyber {
+  font-family: var(--font-heading);
+  color: var(--primary-accent);
+  background-color: transparent;
+  border: 2px solid var(--primary-accent);
+  border-radius: 8px;
+  padding: 12px 24px;
+  cursor: pointer;
+  box-shadow: inset 0 0 10px rgba(148, 0, 255, 0.5), 0 0 0 rgba(148, 0, 255, 0);
+  transition: all 0.2s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-cyber::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.3s ease-in-out;
+}
+
+.btn-cyber:hover {
+  background-color: rgba(148, 0, 255, 0.1);
+  box-shadow: inset 0 0 10px rgba(148, 0, 255, 0.5), 0 0 20px rgba(148, 0, 255, 0.8);
+}
+
+.btn-cyber:hover::before {
+  left: 100%;
+}
+
+.btn-cyber:active {
+  transform: scale(0.98);
+  box-shadow: inset 0 0 15px rgba(148, 0, 255, 0.8), 0 0 5px rgba(148, 0, 255, 0.6);
+}
+
+/* Unified Tab Styles */
+.tab-container {
+  width: 100%;
+  background-color: #0c0c0c;
+  padding: 1rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.tab-list {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.tab-button {
+  padding: 1rem 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  color: #a0a0a0;
+  text-decoration: none;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-button:hover {
+  color: #00f0ff;
+  background-color: transparent;
+}
+
+.tab-button.active {
+  color: #00f0ff;
+  text-shadow: 0 0 10px #00f0ff;
+  border-bottom: 2px solid #00f0ff;
+}
+
+.tab-panels {
+  padding: 1rem 0;
+}
+
+.tab-panel .text-lg {
+    font-size: 1.5rem; /* Increase font size for panel content */
 }

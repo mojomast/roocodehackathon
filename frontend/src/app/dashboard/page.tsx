@@ -2,7 +2,11 @@
 // frontend/src/app/dashboard/page.tsx
 import React, { useState, useEffect } from 'react';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import ProfileCard from '../../components/ProfileCard';
+import Leaderboard from '../../components/Leaderboard';
 import { apiClient, APIError } from '../../utils/apiClient';
+import GlowingCard from '../../components/GlowingCard';
+import { Tabs, TabList, Tab, TabPanels, TabPanel } from '../../components/Tabs';
 
 // Placeholder for a generic LoadingSpinner component
 const LoadingSpinner: React.FC = () => (
@@ -17,6 +21,13 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
     <strong className="font-bold">Error:</strong>
     <span className="block sm:inline"> {message}</span>
   </div>
+);
+
+const DataRow: React.FC<{ label: string; value: React.ReactNode; isLast?: boolean }> = ({ label, value, isLast }) => (
+    <div className={`flex justify-between items-center py-3 ${!isLast ? 'border-b border-gray-700' : ''}`}>
+        <span className="text-lg text-gray-300">{label}</span>
+        <span className="text-lg font-bold text-accent-cyan">{value}</span>
+    </div>
 );
 
 /**
@@ -80,82 +91,89 @@ const DashboardPageContent: React.FC = () => {
   }, []);
 
   // Hardcoded gamification values
-  const points = 1250;
-  const level = 5;
-  const badges = [
-    { name: 'First Commit', icon: '🌟' },
-    { name: 'Bug Hunter', icon: '🐞' },
-    { name: 'Code Master', icon: '🏆' },
-  ];
+  const points = 0;
+  const level = 0;
+  const badges: { name: string; icon: string }[] = [];
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8" role="main">
+    <main className="min-h-screen p-8" role="main">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Welcome to the Dashboard!</h1>
+        <h1 className="text-3xl font-bold font-heading text-primary-red">Hack the Planet!</h1>
       </header>
 
-      {/* Gamification Elements */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" aria-labelledby="gamification-heading">
-        <h2 id="gamification-heading" className="sr-only">Gamification Stats</h2>
-        <div className="bg-white p-6 rounded-lg shadow-md" aria-label={`Points: ${points.toLocaleString()}`}>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">Points</h3>
-          <p className="text-2xl text-blue-600">{points.toLocaleString()}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md" aria-label={`Level: ${level}`}>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">Level</h3>
-          <p className="text-2xl text-green-600">{level}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md" aria-label="Badges">
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">Badges</h3>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {badges.map((badge, index) => (
-              <span key={index} className="bg-purple-100 text-purple-800 text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center">
-                {badge.icon} <span className="ml-1">{badge.name}</span>
-              </span>
-            ))}
-            {badges.length === 0 && <p className="text-gray-500 text-lg">None yet!</p>}
-          </div>
-        </div>
+      <section className="mb-8">
+       <ProfileCard />
       </section>
 
-      {/* Summary Data */}
-      <section className="bg-white p-8 rounded-lg shadow-md mb-8" aria-labelledby="summary-heading">
-        <h2 id="summary-heading" className="text-2xl font-semibold text-gray-700 mb-4">Summary</h2>
-        {loading && <LoadingSpinner />}
-        {error && <ErrorMessage message={error} />}
-        {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg" aria-label={`Connected Repositories: ${totalRepos}`}>
-              <h3 className="text-lg font-medium text-gray-600">Connected Repositories</h3>
-              <p className="text-3xl font-bold text-blue-700">{totalRepos}</p>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg" aria-label={`Completed Jobs: ${completedJobs}`}>
-              <h3 className="text-lg font-medium text-gray-600">Completed Jobs</h3>
-              <p className="text-3xl font-bold text-green-700">{completedJobs}</p>
-            </div>
-          </div>
-        )}
-      </section>
+     <section className="mb-8">
+       <Leaderboard />
+     </section>
 
-      {/* FE-004: Screenshots component with loading states and error handling */}
-      <section className="bg-white p-8 rounded-lg shadow-md" aria-labelledby="screenshots-heading">
-        <h2 id="screenshots-heading" className="text-2xl font-semibold text-gray-700 mb-4">Recent Screenshots</h2>
-        {loadingScreenshots && <LoadingSpinner />}
-        {errorScreenshots && <ErrorMessage message={`Failed to load screenshots: ${errorScreenshots}`} />}
-        {!loadingScreenshots && !errorScreenshots && screenshots.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {screenshots.map((screenshot, index) => (
-              <figure key={index} className="bg-gray-50 p-4 rounded-lg">
-                <img src={screenshot.url} alt={screenshot.description} className="w-full h-auto" />
-                <figcaption className="text-sm text-gray-600 mt-2">{screenshot.description}</figcaption>
-              </figure>
-            ))}
-          </div>
-        )}
-        {!loadingScreenshots && !errorScreenshots && screenshots.length === 0 && (
-          <p className="text-gray-600">No recent screenshots to display.</p>
-        )}
-      </section>
+      <Tabs>
+        <TabList>
+          <Tab index={0}>Points</Tab>
+          <Tab index={1}>Level</Tab>
+          <Tab index={2}>Badges</Tab>
+          <Tab index={3}>Summary</Tab>
+          <Tab index={4}>Recent Screenshots</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel index={0}>
+            <GlowingCard title="Points">
+              <DataRow label="Points" value={points.toLocaleString()} isLast={true} />
+            </GlowingCard>
+          </TabPanel>
+          <TabPanel index={1}>
+            <GlowingCard title="Level">
+              <DataRow label="Level" value={level} isLast={true} />
+            </GlowingCard>
+          </TabPanel>
+          <TabPanel index={2}>
+            <GlowingCard title="Badges">
+              <DataRow label="Badges" value={badges.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {badges.map((badge, index) => (
+                    <span key={index} className="bg-accent-purple text-white text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center">
+                      {badge.icon} <span className="ml-1">{badge.name}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : "None yet!"} isLast={true} />
+            </GlowingCard>
+          </TabPanel>
+          <TabPanel index={3}>
+            <GlowingCard title="Summary">
+              {loading && <LoadingSpinner />}
+              {error && <ErrorMessage message={error} />}
+              {!loading && !error && (
+                <>
+                  <DataRow label="Connected Repositories" value={totalRepos} />
+                  <DataRow label="Completed Jobs" value={completedJobs} isLast={true} />
+                </>
+              )}
+            </GlowingCard>
+          </TabPanel>
+          <TabPanel index={4}>
+            <GlowingCard title="Recent Screenshots">
+              {loadingScreenshots && <LoadingSpinner />}
+              {errorScreenshots && <ErrorMessage message={`Failed to load screenshots: ${errorScreenshots}`} />}
+              {!loadingScreenshots && !errorScreenshots && screenshots.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {screenshots.map((screenshot, index) => (
+                    <figure key={index} className="bg-gray-900 p-4 rounded-lg">
+                      <img src={screenshot.url} alt={screenshot.description} className="w-full h-auto rounded" />
+                      <figcaption className="text-sm text-gray-400 mt-2">{screenshot.description}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+              {!loadingScreenshots && !errorScreenshots && screenshots.length === 0 && (
+                <p className="text-gray-400">No recent screenshots to display.</p>
+              )}
+            </GlowingCard>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </main>
   );
 };

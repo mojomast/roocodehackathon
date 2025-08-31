@@ -43,13 +43,13 @@ const LoginPageContent: React.FC = () => {
   }, [safeRedirect]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-100" role="main">
-      <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md w-full mx-4" role="region" aria-labelledby="login-title">
-        <h1 id="login-title" className="text-2xl font-bold mb-6 text-gray-800">Welcome to FixMyDocs</h1>
-        <p className="text-gray-600 mb-8">Please log in to continue.</p>
+    <main className="min-h-screen flex items-center justify-center" role="main">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center max-w-md w-full mx-4 border border-primary-red" role="region" aria-labelledby="login-title">
+        <h1 id="login-title" className="text-2xl font-bold mb-6 text-white font-heading">Welcome to FixMyDocs</h1>
+        <p className="text-gray-300 mb-8">Please log in to continue.</p>
         <button
           onClick={handleLogin}
-          className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="inline-block bg-primary-red hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-cyan focus:ring-offset-2 focus:ring-offset-gray-800"
           aria-describedby="login-description"
         >
           Login with GitHub

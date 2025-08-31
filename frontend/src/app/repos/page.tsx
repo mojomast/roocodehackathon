@@ -96,21 +96,21 @@ const ReposPage: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8" role="main">
+    <main className="min-h-screen p-8" role="main">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Connect your GitHub Repositories</h1>
+        <h1 className="text-3xl font-bold text-primary-red font-heading">Connect your GitHub Repositories</h1>
       </header>
-      <div className="bg-white p-8 rounded-lg shadow-md mb-8">
-        <h2 className="text-2xl font-semibold mb-4 text-gray-700">Connect New Repository</h2>
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg mb-8 border border-primary-red">
+        <h2 className="text-2xl font-semibold mb-4 text-white">Connect New Repository</h2>
         <form onSubmit={handleConnectRepo} className="space-y-4">
           <div>
-            <label htmlFor="repoName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="repoName" className="block text-sm font-medium text-gray-300">
               Repository Name
             </label>
             <input
               type="text"
               id="repoName"
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              className="mt-1 block w-full p-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm focus:ring-accent-cyan focus:border-accent-cyan text-white"
               value={repoName}
               onChange={(e) => setRepoName(e.target.value)}
               required
@@ -118,13 +118,13 @@ const ReposPage: React.FC = () => {
             />
           </div>
           <div>
-            <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-300">
               Repository URL
             </label>
             <input
               type="url"
               id="repoUrl"
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              className="mt-1 block w-full p-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm focus:ring-accent-cyan focus:border-accent-cyan text-white"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               required
@@ -133,43 +133,43 @@ const ReposPage: React.FC = () => {
           </div>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-primary-red text-white font-semibold rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-accent-cyan focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={connectingRepo}
           >
             {connectingRepo ? 'Connecting...' : 'Connect Repository'}
           </button>
         </form>
         {connectMessage && (
-          <p className={`mt-4 text-sm ${connectMessage.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>
+          <p className={`mt-4 text-sm ${connectMessage.includes('successfully') ? 'text-green-500' : 'text-red-500'}`}>
             {connectMessage}
           </p>
         )}
       </div>
 
-      <div className="bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-4 text-gray-700">Connected Repositories</h2>
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg border border-primary-red">
+        <h2 className="text-2xl font-semibold mb-4 text-white">Connected Repositories</h2>
         {loadingRepos && <LoadingSpinner />}
         {fetchMessage && <ErrorMessage message={fetchMessage} />}
         {!loadingRepos && !fetchMessage && (
           repos.length === 0 ? (
-            <p className="text-gray-600">No repositories connected yet.</p>
+            <p className="text-gray-400">No repositories connected yet.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {repos.map((repo) => (
-                <div key={repo.id} className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
-                  <p className="text-lg font-medium text-gray-900 truncate" title={repo.repo_name}>{repo.repo_name}</p>
+                <div key={repo.id} className="bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-700">
+                  <p className="text-lg font-medium text-white truncate" title={repo.repo_name}>{repo.repo_name}</p>
                   <a
                     href={repo.repo_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline truncate block"
+                    className="text-sm text-accent-cyan hover:underline truncate block"
                     title={repo.repo_url}
                   >
                     {repo.repo_url}
                   </a>
                   <button
                     onClick={() => handleRunAnalysis(repo.id)}
-                    className="mt-3 w-full px-3 py-1 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-3 w-full px-3 py-1 bg-primary-red text-white font-semibold rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-accent-cyan focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={runningAnalysis === repo.id}
                   >
                     {runningAnalysis === repo.id ? 'Analyzing...' : 'Run Analysis'}

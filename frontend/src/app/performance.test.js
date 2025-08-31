@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/react';
 import DashboardPage from './dashboard/page';
 import { server } from '../mocks/server';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 
 describe('Performance Tests', () => {
   describe('Load Time Performance', () => {
@@ -47,8 +47,11 @@ describe('Performance Tests', () => {
   describe('Response Time Tests', () => {
     test('API response time meets performance targets', async () => {
       server.use(
-        rest.get('/api/dashboard/stats', (req, res, ctx) => {
-          return res(ctx.delay(150), ctx.json({ totalRepos: 5, completedJobs: 12 }));
+        http.get('/api/dashboard/stats', () => {
+          return HttpResponse.json(
+            { totalRepos: 5, completedJobs: 12 },
+            { delay: 150 }
+          );
         })
       );
 
