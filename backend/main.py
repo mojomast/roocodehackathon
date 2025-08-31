@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Add project root to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,10 +17,15 @@ from starlette.responses import RedirectResponse
 import httpx # Import httpx for making HTTP requests
 from contextlib import asynccontextmanager
 from backend.models import Base, engine, get_db, User, Repo, Job, APIKey
+from backend.migrate import run_migration
 from cryptography.fernet import Fernet
 import os
 import hmac
 import hashlib
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Lifespan event handler using asynccontextmanager
 @asynccontextmanager
@@ -24,6 +35,9 @@ async def lifespan(app: FastAPI):
     Creates all database tables if they don't already exist during startup.
     """
     # Startup
+    # Run the migration script to ensure the schema is up-to-date
+    run_migration()
+    # Create all tables if they don't exist
     Base.metadata.create_all(bind=engine)
     yield
     # Shutdown (if needed in the future)
@@ -56,18 +70,22 @@ async def verify_auth_token(x_auth_token: Annotated[str | None, Header()] = None
     Looks up the access_token in the User table. If not found, returns 401 Unauthorized.
     Returns the authenticated User object on success.
     """
+    print(f"DEBUG: Verifying auth token: {x_auth_token}")
     if not x_auth_token:
+        print("DEBUG: Auth token is missing.")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized: X-Auth-Token header missing")
 
     try:
         user = db.query(User).filter(User.access_token == x_auth_token).one_or_none()
         if not user:
+            print(f"DEBUG: User not found for token: {x_auth_token}")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized: Invalid access token")
         
         # Optional: Check for token expiration if you add an expiry date to the user model
         # if user.token_expires_at and user.token_expires_at < datetime.now(timezone.utc):
         #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized: Token has expired")
 
+        print(f"DEBUG: User {user.username} authenticated successfully.")
         return user
     except SQLAlchemyError:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error during token validation")

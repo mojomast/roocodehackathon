@@ -33,38 +33,58 @@ def run_migration():
         # Add new columns to jobs table
         # Note: Using CHECK constraint for progress not enforced in SQLite, but ok for PostgreSQL
 
+        print("Executing migration: Adding 'clone_path' column...")
         conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN IF NOT EXISTS clone_path VARCHAR(500);
         """))
+        conn.commit()
+        print("'clone_path' column added or already exists.")
  
+        print("Executing migration: Adding 'progress' column...")
         conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
         """))
+        conn.commit()
+        print("'progress' column added or already exists.")
  
+        print("Executing migration: Adding 'error_message' column...")
         conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN IF NOT EXISTS error_message TEXT;
         """))
+        conn.commit()
+        print("'error_message' column added or already exists.")
  
+        print("Executing migration: Adding 'retry_count' column...")
         conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
         """))
+        conn.commit()
+        print("'retry_count' column added or already exists.")
  
+        print("Executing migration: Adding 'provider' column...")
         conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN IF NOT EXISTS provider VARCHAR(255) DEFAULT 'openai';
         """))
+        conn.commit()
+        print("'provider' column added or already exists.")
  
+        print("Executing migration: Adding 'model_name' column...")
         conn.execute(text("""
             ALTER TABLE jobs ADD COLUMN IF NOT EXISTS model_name VARCHAR(255) DEFAULT 'gpt-4-turbo';
         """))
+        conn.commit()
+        print("'model_name' column added or already exists.")
  
         # Update existing records to have default progress if needed
         conn.execute(text("""
             UPDATE jobs SET progress = 0 WHERE progress IS NULL;
         """))
+        conn.commit()
 
         conn.execute(text("""
             UPDATE jobs SET retry_count = 0 WHERE retry_count IS NULL;
         """))
+        conn.commit()
 
         # For PostgreSQL, this might be needed, but in SQLite it's fine
         # conn.commit() if using raw conn

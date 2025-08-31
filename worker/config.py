@@ -8,6 +8,10 @@ management in the documentation generation system.
 import os
 from typing import Dict, Any, Optional
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class Config:
