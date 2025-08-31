@@ -30,6 +30,7 @@ class JobStatusEnum(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"
+    PAUSED = "paused"
 
 # Dependency to get the database session
 def get_db():
@@ -96,11 +97,28 @@ class Job(Base):
     id = Column(Integer, primary_key=True, index=True)
     repo_id = Column(Integer, ForeignKey("repos.id"))
     status = Column(String, default=JobStatusEnum.PENDING.value) # Unified job status
+    provider = Column(String, nullable=True, default="openai") # New field
+    model_name = Column(String, nullable=True, default="gpt-4-turbo") # New field
     clone_path = Column(String, nullable=True) # Path where repository is cloned for processing
     progress = Column(Integer, default=0) # Progress percentage (0-100)
     error_message = Column(Text, nullable=True) # Error details if job fails
     retry_count = Column(Integer, default=0) # Number of retries attempted
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+ 
     repository = relationship("Repo", back_populates="jobs")
+class APIKey(Base):
+    """
+    SQLAlchemy model for an API Key.
+    Represents an API key for a specific service, linked to a user.
+    """
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    service = Column(String, nullable=False)
+    encrypted_key = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    owner = relationship("User")

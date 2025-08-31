@@ -15,7 +15,10 @@ import os
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
-load_dotenv()
+# Construct the path to the .env file relative to this script's location
+script_dir = os.path.dirname(os.path.abspath(__file__))
+dotenv_path = os.path.join(script_dir, '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
 def run_migration():
     # Use the same DATABASE_URL as in models.py
@@ -31,21 +34,29 @@ def run_migration():
         # Note: Using CHECK constraint for progress not enforced in SQLite, but ok for PostgreSQL
 
         conn.execute(text("""
-            ALTER TABLE jobs ADD COLUMN clone_path VARCHAR(500);
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS clone_path VARCHAR(500);
         """))
-
+ 
         conn.execute(text("""
-            ALTER TABLE jobs ADD COLUMN progress INTEGER DEFAULT 0;
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0;
         """))
-
+ 
         conn.execute(text("""
-            ALTER TABLE jobs ADD COLUMN error_message TEXT;
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS error_message TEXT;
         """))
-
+ 
         conn.execute(text("""
-            ALTER TABLE jobs ADD COLUMN retry_count INTEGER DEFAULT 0;
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
         """))
-
+ 
+        conn.execute(text("""
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS provider VARCHAR(255) DEFAULT 'openai';
+        """))
+ 
+        conn.execute(text("""
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS model_name VARCHAR(255) DEFAULT 'gpt-4-turbo';
+        """))
+ 
         # Update existing records to have default progress if needed
         conn.execute(text("""
             UPDATE jobs SET progress = 0 WHERE progress IS NULL;

@@ -31,6 +31,8 @@ const ReposPage: React.FC = () => {
   const [loadingRepos, setLoadingRepos] = useState<boolean>(true);
   const [connectingRepo, setConnectingRepo] = useState<boolean>(false);
   const [runningAnalysis, setRunningAnalysis] = useState<number | null>(null); // Stores repoId being analyzed
+  const [provider, setProvider] = useState('openai');
+  const [modelName, setModelName] = useState('gpt-4-turbo');
 
   const fetchRepos = async () => {
     setLoadingRepos(true);
@@ -81,7 +83,7 @@ const ReposPage: React.FC = () => {
     setConnectMessage(''); // Clear previous messages
     setRunningAnalysis(repoId);
     try {
-      const data = await apiClient.createJob({ repo_id: repoId });
+      const data = await apiClient.createJob({ repo_id: repoId, provider, model_name: modelName });
       setConnectMessage(data.message || 'Analysis triggered successfully!');
     } catch (error) {
       if (error instanceof APIError) {
@@ -167,6 +169,26 @@ const ReposPage: React.FC = () => {
                   >
                     {repo.repo_url}
                   </a>
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <label htmlFor={`provider-${repo.id}`} className="block text-sm font-medium text-gray-700">Provider</label>
+                      <select id={`provider-${repo.id}`} value={provider} onChange={(e) => setProvider(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="openrouter">OpenRouter</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor={`model-${repo.id}`} className="block text-sm font-medium text-gray-700">Model Name</label>
+                      <input
+                        type="text"
+                        id={`model-${repo.id}`}
+                        value={modelName}
+                        onChange={(e) => setModelName(e.target.value)}
+                        className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
                   <button
                     onClick={() => handleRunAnalysis(repo.id)}
                     className="mt-3 w-full px-3 py-1 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"

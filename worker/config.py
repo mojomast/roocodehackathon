@@ -126,7 +126,7 @@ class Config:
         missing = []
 
         for key in required_keys:
-            if not self.get(key):
+            if not os.getenv(key.upper()):
                 missing.append(key)
 
         if missing:

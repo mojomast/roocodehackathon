@@ -8,6 +8,8 @@ from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
 load_dotenv()
 
+# Fix for task name consistency when running as 'python -m worker.worker'
+
 # Diagnostic logging for environment and system info
 def log_system_info():
     """Log comprehensive system and environment information for debugging."""
@@ -61,11 +63,12 @@ import datetime
 
 from worker.job_manager import JobManager
 from worker.repo_manager import RepoManager
-from worker.parser import Parser
+from worker.parser import CodeAnalyzer
 from worker.ai_orchestrator import AIOrchestrator
 from worker.patcher import Patcher
 from worker.logger import Logger
 from worker.config import Config
+from worker.auth_providers import AuthProvider, RealAuthProvider, MockAuthProvider
 
 # Configure logging with more verbose level for debugging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -273,17 +276,42 @@ except Exception as e:
 
 Base = declarative_base()
 
+from sqlalchemy import Text
+
 class Job(Base):
-    __tablename__ = 'jobs'
-    id = Column(Integer, primary_key=True)
-    status = Column(String, default='pending')
-    repo_url = Column(String)
-    clone_path = Column(String)
+    """
+    SQLAlchemy model for a Job.
+    Represents a documentation generation job for a repository.
+    Updated to match backend schema.
+    """
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_id = Column(Integer)
+    status = Column(String, default="pending")
+    provider = Column(String, nullable=True, default="openai")
+    model_name = Column(String, nullable=True, default="gpt-4-turbo")
+    clone_path = Column(String, nullable=True)
+    progress = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     def __repr__(self):
         return f"<Job(id={self.id}, status='{self.status}')>"
+
+class Repo(Base):
+    """
+    SQLAlchemy model for a Repository.
+    Represents a repository linked by a user.
+    Required for JOIN with Job to get repo_url.
+    """
+    __tablename__ = "repos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_url = Column(String, index=True)
+    repo_name = Column(String, index=True)
 
 # WK-009: Enhanced database engine creation with error handling
 try:
@@ -304,8 +332,8 @@ except Exception as e:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@app.task(bind=True)
-def process_documentation_job(self, job_id: int):
+@app.task(bind=True, name='worker.worker.process_documentation_job')
+def process_documentation_job(self, job_id: int, auth_provider: AuthProvider | None = None):
     """
     WK-014: Placeholder task for processing documentation jobs with proper transaction handling.
     In a real scenario, this would handle the logic for generating documentation.
@@ -322,53 +350,87 @@ def process_documentation_job(self, job_id: int):
     except Exception as e:
         logging.error(f"DEBUG-003: Error accessing task metadata: {e}, continuing with job processing")
 
-    db = SessionLocal()
+    job_id_for_error = None
+    clone_success = False
+    job_manager = None
+
     try:
-        # WK-014: Use transaction context manager for proper scope and rollback
-        with db.begin():
-            job = db.query(Job).filter(Job.id == job_id).first()
+        # Phase 1: Query job info (fresh session)
+        query_session = SessionLocal()
+        try:
+            job = query_session.query(Job, Repo).join(Repo, Job.repo_id == Repo.id).filter(Job.id == job_id).first()
             if not job:
                 logging.error(f"Job with ID {job_id} not found.")
                 return
 
-            job_manager = JobManager(db, job)
-            repo_manager = RepoManager()
-            parser = Parser()
-            ai_orchestrator = AIOrchestrator()
-            patcher = Patcher()
-            app_logger = Logger()
-            config = Config() # Placeholder for future configuration
+            # Unpack the query result
+            job_obj, repo_obj = job
+            job_id_for_error = job_obj.id
+        finally:
+            query_session.close()
 
-            # 1. Start Job
-            job_manager.start_job()
+        # Phase 2: Start Job
+        with SessionLocal() as session:
+            with session.begin():
+                job_to_start = session.query(Job).filter(Job.id == job_id_for_error).first()
+                if not job_to_start:
+                    logging.error(f"Could not find job to start: {job_id_for_error}")
+                    return
+                job_manager = JobManager(session, job_to_start, job_id_for_error)
+                job_manager.start_job()
 
-            # 2. Clone Repo
-            repo_manager.clone_repo(job.repo_url, job.clone_path) # Assuming job has repo_url and clone_path
+        # Phase 3: Clone Repo (no database operations)
+        repo_manager = RepoManager(auth_provider=auth_provider)
+        clone_success = repo_manager.clone_repo(repo_obj.repo_url, job_obj.clone_path)
+        if not clone_success:
+            with SessionLocal() as session:
+                with session.begin():
+                    job_to_fail = session.query(Job).filter(Job.id == job_id_for_error).first()
+                    if job_to_fail:
+                        fail_manager = JobManager(session, job_to_fail, job_id_for_error)
+                        fail_manager.fail_job("Repository cloning failed")
+            return
 
-            # 3. Parse Code
-            parser.parse_code(job.clone_path)
+        # Phase 4: Process remaining steps
+        with SessionLocal() as session:
+            with session.begin():
+                job_to_process = session.query(Job).filter(Job.id == job_id_for_error).first()
+                if not job_to_process:
+                    logging.error(f"Could not find job to process: {job_id_for_error}")
+                    return
 
-            # 4. Generate Docs
-            ai_orchestrator.generate_documentation(job.clone_path)
+                parser = CodeAnalyzer()
+                ai_orchestrator = AIOrchestrator(provider=job_to_process.provider, model_name=job_to_process.model_name)
+                patcher = Patcher()
+                app_logger = Logger()
+                config = Config()
 
-            # 5. Create Patch/PR
-            patcher.create_patch_or_pr(job.clone_path)
+                # 3. Parse Code
+                parser.analyze_file(job_to_process.clone_path)
 
-            # 6. Log Progress
-            app_logger.log_progress(f"Job {job_id} completed successfully.")
+                # 4. Generate Docs
+                ai_orchestrator.generate_documentation(job_to_process.clone_path)
 
-            # 7. Complete Job
-            job_manager.complete_job()
+                # 5. Create Patch/PR
+                patcher.create_patch_or_pr(job_to_process.clone_path)
+
+                # 6. Log Progress
+                app_logger.log_progress(f"Job {job_id} completed successfully.")
+
+                # 7. Complete Job
+                process_manager = JobManager(session, job_to_process, job_id_for_error)
+                process_manager.complete_job()
 
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {e}")
-        db.invalidate()  # Invalidate session on error to prevent dirty state
-        # WK-014: Transaction rollback handled automatically by context manager
-        if 'job_manager' in locals():
-            job_manager.fail_job(str(e)) # Assuming job_manager has a fail_job method
-    finally:
-        # WK-014: Proper session cleanup
-        db.close()
+        # If we have job information, try to fail it one last time
+        if job_id_for_error:
+            with SessionLocal() as session:
+                with session.begin():
+                    job_to_fail = session.query(Job).filter(Job.id == job_id_for_error).first()
+                    if job_to_fail:
+                        temp_manager = JobManager(session, job_to_fail, job_id_for_error)
+                        temp_manager.fail_job(f"Unexpected error: {str(e)}")
 
 if __name__ == '__main__':
     # This block is typically used for running the worker directly for testing or development.

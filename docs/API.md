@@ -115,8 +115,11 @@ Initiates a new documentation analysis job for a connected repository.
 **Request Body:**
 ```json
 {
-  "repo_id": 123
+  "repo_id": 123,
+  "provider": "openrouter",
+  "model_name": "gryphe/mythomax-l2-13b"
 }
+**Note:** `provider` and `model_name` are optional fields. If not provided, the system will use the default provider and model.
 ```
 
 **Response (200):**
@@ -226,6 +229,49 @@ Lightweight endpoint for polling job status.
 
 **Error Responses:**
 - `404 Not Found` - Job not found
+
+### API Key Management
+
+#### List API Keys
+**GET** `/api/keys`
+
+Returns all API keys for the authenticated user.
+
+**Response (200):**
+```json
+{
+  "keys": [
+    {
+      "id": 1,
+      "key": "fdm_...",
+      "created_at": "2025-08-30T12:00:00Z"
+    }
+  ]
+}
+```
+
+#### Create API Key
+**POST** `/api/keys`
+
+Creates a new API key for the authenticated user.
+
+**Response (200):**
+```json
+{
+  "key": "fdm_...",
+  "id": 2
+}
+```
+
+#### Revoke API Key
+**DELETE** `/api/keys/{id}`
+
+Revokes an API key.
+
+**Response (204):** No Content
+
+**Error Responses:**
+- `404 Not Found` - API key not found or not owned by user
 
 ### Dashboard
 

@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 import httpx # Import httpx for making HTTP requests
 from contextlib import asynccontextmanager
-
-from backend.models import Base, engine, get_db, User, Repo, Job
+from backend.models import Base, engine, get_db, User, Repo, Job, APIKey
+from cryptography.fernet import Fernet
 import os
 import hmac
 import hashlib
@@ -191,6 +191,31 @@ async def github_callback(code: str, db: Session = Depends(get_db)): # This rout
     dashboard_url = f"{frontend_url}/dashboard?token={access_token}"
     return RedirectResponse(url=dashboard_url, status_code=status.HTTP_302_FOUND)
 
+class APIKeyCreate(BaseModel):
+    service: str
+    api_key: str
+
+class APIKeyUpdate(BaseModel):
+    api_key: str
+
+class APIKeyResponse(BaseModel):
+    id: int
+    service: str
+    last_4_chars: str
+    created_at: datetime
+
+# Encryption key (should be stored securely, e.g., in environment variables)
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+if not ENCRYPTION_KEY:
+    raise ValueError("ENCRYPTION_KEY environment variable is required")
+fernet = Fernet(ENCRYPTION_KEY.encode())
+
+def encrypt_key(key: str) -> str:
+    return fernet.encrypt(key.encode()).decode()
+
+def decrypt_key(encrypted_key: str) -> str:
+    return fernet.decrypt(encrypted_key.encode()).decode()
+
 class RepoConnectRequest(BaseModel):
     repo_url: str
     repo_name: str # Assuming repo_name is also part of the details
@@ -202,7 +227,11 @@ async def connect_repository(request: RepoConnectRequest, user: User = Depends(v
     Accepts repository URL and name, creates a Repo record, and returns its ID.
     Uses the authenticated user for association instead of dummy user.
     """
-    new_repo = Repo(user_id=user.id, repo_url=request.repo_url, repo_name=request.repo_name, status="connected")
+    # Construct the full repository URL without encoding here.
+    # Encoding will be handled by the worker.
+    full_repo_url = f"{request.repo_url.rstrip('/')}/{request.repo_name}"
+    
+    new_repo = Repo(user_id=user.id, repo_url=full_repo_url, repo_name=request.repo_name, status="connected")
     db.add(new_repo)
     db.commit()
     db.refresh(new_repo)
@@ -232,7 +261,9 @@ def process_documentation_job(job_id: int):
 
 class JobCreateRequest(BaseModel):
     repo_id: int
-
+    provider: str | None = "openai"
+    model_name: str | None = "gpt-4-turbo"
+ 
 @app.post("/api/docs/run", dependencies=[Depends(verify_auth_token)])
 async def trigger_documentation_run(request: JobCreateRequest, db: Session = Depends(get_db)):
     """
@@ -242,15 +273,21 @@ async def trigger_documentation_run(request: JobCreateRequest, db: Session = Dep
     repo = db.query(Repo).filter(Repo.id == request.repo_id).first()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
-
-    new_job = Job(repo_id=request.repo_id, status="pending", created_at=datetime.now(timezone.utc))
+ 
+    new_job = Job(
+        repo_id=request.repo_id,
+        status="pending",
+        provider=request.provider,
+        model_name=request.model_name,
+        created_at=datetime.now(timezone.utc)
+    )
     db.add(new_job)
     db.commit()
     db.refresh(new_job)
-
+ 
     # Dispatch task to Celery worker
-    process_documentation_job(new_job.id) # Call the placeholder function
-
+    process_documentation_job(new_job.id)
+ 
     return {"message": "Documentation run triggered", "job_id": new_job.id, "status": "pending"}
 
 @app.get("/api/jobs/status/{job_id}", dependencies=[Depends(verify_auth_token)])
@@ -271,6 +308,78 @@ async def get_all_jobs(db: Session = Depends(get_db)):
     """
     jobs = db.query(Job).all()
     return [{"job_id": job.id, "repo_id": job.repo_id, "status": job.status, "created_at": job.created_at, "updated_at": job.updated_at} for job in jobs]
+
+@app.post("/api/jobs/kill/{job_id}", dependencies=[Depends(verify_auth_token)])
+async def kill_job(job_id: int, db: Session = Depends(get_db)):
+    """
+    Kills (cancels) a specific documentation job.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Update job status to canceled
+    job.status = "canceled"
+    job.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"message": f"Job {job_id} has been killed", "job_id": job_id, "status": "canceled"}
+
+@app.post("/api/jobs/pause/{job_id}", dependencies=[Depends(verify_auth_token)])
+async def pause_job(job_id: int, db: Session = Depends(get_db)):
+    """
+    Pauses a specific documentation job.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Check if job can be paused (only running or pending jobs)
+    if job.status not in ["pending", "running"]:
+        raise HTTPException(status_code=400, detail=f"Job {job_id} cannot be paused (current status: {job.status})")
+
+    # Update job status to paused
+    job.status = "paused"
+    job.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"message": f"Job {job_id} has been paused", "job_id": job_id, "status": "paused"}
+
+@app.post("/api/jobs/kill-all", dependencies=[Depends(verify_auth_token)])
+async def kill_all_jobs(db: Session = Depends(get_db)):
+    """
+    Kills (cancels) all documentation jobs.
+    """
+    running_pending_jobs = db.query(Job).filter(Job.status.in_(["pending", "running", "paused"])).all()
+
+    # Update all jobs to canceled
+    updated_count = 0
+    for job in running_pending_jobs:
+        job.status = "canceled"
+        job.updated_at = datetime.now(timezone.utc)
+        updated_count += 1
+
+    db.commit()
+
+    return {"message": f"Successfully killed {updated_count} jobs", "count": updated_count, "status": "canceled"}
+
+@app.post("/api/jobs/pause-all", dependencies=[Depends(verify_auth_token)])
+async def pause_all_jobs(db: Session = Depends(get_db)):
+    """
+    Pauses all documentation jobs.
+    """
+    running_jobs = db.query(Job).filter(Job.status.in_(["pending", "running"])).all()
+
+    # Update all jobs to paused
+    updated_count = 0
+    for job in running_jobs:
+        job.status = "paused"
+        job.updated_at = datetime.now(timezone.utc)
+        updated_count += 1
+
+    db.commit()
+
+    return {"message": f"Successfully paused {updated_count} jobs", "count": updated_count, "status": "paused"}
 
 # GitHub App Integration Stubs
 # These functions would interact with the GitHub API for operations like:
@@ -413,6 +522,76 @@ def parse_github_repo(repo_url: str) -> tuple[str | None, str | None]:
     except Exception:
         pass
     return None, None
+@app.post("/api/keys", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
+async def create_api_key(request: APIKeyCreate, user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Adds a new API key for a user.
+    """
+    encrypted_key = encrypt_key(request.api_key)
+    new_key = APIKey(
+        user_id=user.id,
+        service=request.service,
+        encrypted_key=encrypted_key
+    )
+    db.add(new_key)
+    db.commit()
+    db.refresh(new_key)
+    return APIKeyResponse(
+        id=new_key.id,
+        service=new_key.service,
+        last_4_chars=f"sk-...{request.api_key[-4:]}",
+        created_at=new_key.created_at
+    )
+
+@app.get("/api/keys", response_model=list[APIKeyResponse])
+async def get_api_keys(user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Retrieves all API keys for the authenticated user.
+    """
+    keys = db.query(APIKey).filter(APIKey.user_id == user.id).all()
+    response = []
+    for key in keys:
+        decrypted_key = decrypt_key(key.encrypted_key)
+        response.append(APIKeyResponse(
+            id=key.id,
+            service=key.service,
+            last_4_chars=f"sk-...{decrypted_key[-4:]}",
+            created_at=key.created_at
+        ))
+    return response
+
+@app.put("/api/keys/{key_id}", response_model=APIKeyResponse)
+async def update_api_key(key_id: int, request: APIKeyUpdate, user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Updates an existing API key.
+    """
+    key = db.query(APIKey).filter(APIKey.id == key_id, APIKey.user_id == user.id).first()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found")
+    
+    key.encrypted_key = encrypt_key(request.api_key)
+    key.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(key)
+
+    return APIKeyResponse(
+        id=key.id,
+        service=key.service,
+        last_4_chars=f"sk-...{request.api_key[-4:]}",
+        created_at=key.created_at
+    )
+
+@app.delete("/api/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_api_key(key_id: int, user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):
+    """
+    Deletes an API key.
+    """
+    key = db.query(APIKey).filter(APIKey.id == key_id, APIKey.user_id == user.id).first()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found")
+    
+    db.delete(key)
+    db.commit()
 
 @app.get("/api/repos", dependencies=[Depends(verify_auth_token)])
 async def list_repositories(user: User = Depends(verify_auth_token), db: Session = Depends(get_db)):

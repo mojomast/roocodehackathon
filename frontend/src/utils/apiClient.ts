@@ -122,6 +122,8 @@ export interface RepoConnectResponse {
 
 export interface JobCreateRequest {
   repo_id: number;
+  provider?: string;
+  model_name?: string;
 }
 
 export interface JobCreateResponse {
@@ -164,6 +166,22 @@ export interface ScreenshotsResponse {
   screenshots: string[]; // URLs or base64
 }
 
+export interface ApiKey {
+  id: number;
+  service: string;
+  last_4_chars: string;
+  created_at: string;
+}
+
+export interface ApiKeyCreateRequest {
+  service: string;
+  api_key: string;
+}
+
+export interface ApiKeyUpdateRequest {
+  api_key: string;
+}
+
 // API client functions - typed and standardized
 export const apiClient = {
   // Repository management
@@ -183,12 +201,37 @@ export const apiClient = {
   getJobStatus: (jobId: number): Promise<JobStatusResponse> =>
     apiRequest(`/api/jobs/status/${jobId}`, { method: 'GET' }),
 
+  killJob: (jobId: number): Promise<{ message: string; job_id: number; status: string }> =>
+    apiRequest(`/api/jobs/kill/${jobId}`, { method: 'POST' }),
+
+  pauseJob: (jobId: number): Promise<{ message: string; job_id: number; status: string }> =>
+    apiRequest(`/api/jobs/pause/${jobId}`, { method: 'POST' }),
+
+  killAllJobs: (): Promise<{ message: string; count: number; status: string }> =>
+    apiRequest('/api/jobs/kill-all', { method: 'POST' }),
+
+  pauseAllJobs: (): Promise<{ message: string; count: number; status: string }> =>
+    apiRequest('/api/jobs/pause-all', { method: 'POST' }),
+
   // Dashboard (placeholder endpoints - to be updated when backend implements)
   getDashboardStats: (): Promise<DashboardStatsResponse> =>
     apiRequest('/api/dashboard/stats', { method: 'GET' }),
 
   getScreenshots: (): Promise<ScreenshotsResponse> =>
     apiRequest('/api/screenshots', { method: 'GET' }),
+
+  // API Key Management
+  getApiKeys: (): Promise<ApiKey[]> =>
+    apiRequest('/api/keys', { method: 'GET' }),
+
+  createApiKey: (data: ApiKeyCreateRequest): Promise<ApiKey> =>
+    apiRequest('/api/keys', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateApiKey: (keyId: number, data: ApiKeyUpdateRequest): Promise<ApiKey> =>
+    apiRequest(`/api/keys/${keyId}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deleteApiKey: (keyId: number): Promise<void> =>
+    apiRequest(`/api/keys/${keyId}`, { method: 'DELETE' }),
 };
 
 export default apiClient;

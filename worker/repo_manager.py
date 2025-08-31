@@ -12,6 +12,8 @@ from typing import Optional, Dict
 import urllib.parse
 import time
 
+from worker.auth_providers import AuthProvider, RealAuthProvider
+
 # WK-013: Import GitPython for actual git operations
 try:
     import git
@@ -32,18 +34,25 @@ class RepoManager:
     and provides secure authentication methods.
     """
 
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: Optional[Dict] = None, auth_provider: Optional[AuthProvider] = None):
         """
-        Initialize RepoManager with configuration.
+        Initialize RepoManager with configuration and an optional authentication provider.
 
         Args:
             config (Optional[Dict]): Configuration including credentials, timeouts, etc.
+            auth_provider (Optional[AuthProvider]): An authentication provider. If None,
+                                                 a RealAuthProvider will be used.
         """
         self.logger = logging.getLogger(__name__)
         self.config = config or {}
         self.timeout = self.config.get('clone_timeout', 300)  # 5 minutes default
         self.git_command = self.config.get('git_command', 'git')
         self.temp_dir = self.config.get('temp_dir', '/tmp/repos')
+
+        if auth_provider:
+            self.auth_provider = auth_provider
+        else:
+            self.auth_provider = RealAuthProvider(self.config)
 
         # Ensure temp directory exists
         os.makedirs(self.temp_dir, exist_ok=True)
@@ -79,7 +88,7 @@ class RepoManager:
             os.makedirs(os.path.dirname(clone_path), exist_ok=True)
 
             # Prepare authenticated URL or configuration
-            auth_config = self._prepare_git_auth_config(repo_url)
+            auth_config = self.auth_provider.prepare_git_auth_config(repo_url)
 
             # Clone repository with GitPython
             self.logger.debug("WK-013: Executing GitPython clone operation")
@@ -104,6 +113,9 @@ class RepoManager:
             elif auth_config.get('use_token'):
                 # Use personal access token in URL
                 repo_url = auth_config['authenticated_url']
+
+            # URL encode the path component to handle spaces
+            repo_url = self._encode_repo_url_path(repo_url)
 
             try:
                 repo = Repo.clone_from(
@@ -170,8 +182,11 @@ class RepoManager:
             os.makedirs(os.path.dirname(clone_path), exist_ok=True)
 
             # Get authentication configuration
-            auth_config = self._prepare_git_auth_config(repo_url)
+            auth_config = self.auth_provider.prepare_git_auth_config(repo_url)
             cmd_url = auth_config.get('authenticated_url', repo_url)
+
+            # URL encode the path component to handle spaces
+            cmd_url = self._encode_repo_url_path(cmd_url)
 
             # Execute git clone with timeout
             cmd = [
@@ -216,161 +231,6 @@ class RepoManager:
             self.logger.error(f"WK-013: Error cloning repository with subprocess: {e}")
             return False
 
-    def _prepare_git_auth_config(self, url: str) -> dict:
-        """
-        WK-013: Prepare git authentication configuration for cloning.
-
-        Handles various authentication methods including SSH keys,
-        personal access tokens, and credential storage.
-
-        Args:
-            url (str): Original repository URL
-
-        Returns:
-            dict: Authentication configuration for git operations
-        """
-        auth_config = {
-            'authenticated_url': url,
-            'use_ssh': False,
-            'use_token': False,
-            'env': os.environ.copy()
-        }
-
-        try:
-            # Check for SSH key configuration
-            ssh_key_path = self.config.get('ssh_key_path') or os.getenv('GIT_SSH_KEY_PATH')
-            if ssh_key_path and os.path.exists(ssh_key_path):
-                self.logger.info("WK-013: Using SSH key for git authentication")
-                auth_config['use_ssh'] = True
-                auth_config['ssh_key_path'] = ssh_key_path
-
-                # Set up SSH command
-                auth_config['env']['GIT_SSH_COMMAND'] = f'ssh -i {ssh_key_path} -o IdentitiesOnly=yes'
-
-                # If it's an SSH URL, don't modify it
-                if url.startswith('git@') or url.startswith('ssh://'):
-                    auth_config['authenticated_url'] = url
-
-                return auth_config
-
-            # Check for personal access token
-            token = self._get_access_token(url)
-            if token:
-                self.logger.info("WK-013: Using personal access token for git authentication")
-                auth_config['use_token'] = True
-                auth_config['authenticated_url'] = self._embed_token_in_url(url, token)
-
-                return auth_config
-
-            # Check for credential helper or stored credentials
-            stored_creds = self._get_stored_credentials(url)
-            if stored_creds:
-                self.logger.info("WK-013: Using stored credentials for git authentication")
-                auth_config['authenticated_url'] = self._embed_token_in_url(url, stored_creds['password'])
-                auth_config['use_token'] = True
-
-                return auth_config
-
-            # No authentication configured
-            self.logger.info("WK-013: No authentication configured - proceeding without credentials")
-            return auth_config
-
-        except Exception as e:
-            self.logger.warning(f"WK-013: Error preparing git authentication config: {e}")
-            # Return basic config without authentication
-            return auth_config
-
-    def _get_access_token(self, url: str) -> Optional[str]:
-        """
-        WK-013: Get personal access token for the repository platform.
-
-        Args:
-            url (str): Repository URL
-
-        Returns:
-            Optional[str]: Access token or None
-        """
-        try:
-            # Extract platform from URL
-            if 'github.com' in url:
-                token = self.config.get('github_token') or os.getenv('GITHUB_TOKEN')
-                if token:
-                    return token
-            elif 'gitlab.com' in url:
-                token = self.config.get('gitlab_token') or os.getenv('GITLAB_TOKEN')
-                if token:
-                    return token
-            elif 'bitbucket.org' in url:
-                token = self.config.get('bitbucket_token') or os.getenv('BITBUCKET_TOKEN')
-                if token:
-                    return token
-
-            # Check for generic token
-            generic_token = self.config.get('access_token') or os.getenv('GIT_ACCESS_TOKEN')
-            if generic_token:
-                return generic_token
-
-            return None
-
-        except Exception as e:
-            self.logger.warning(f"WK-013: Error getting access token: {e}")
-            return None
-
-    def _embed_token_in_url(self, url: str, token: str) -> str:
-        """
-        WK-013: Embed token in repository URL for authentication.
-
-        Args:
-            url (str): Original repository URL
-            token (str): Access token
-
-        Returns:
-            str: URL with embedded token
-        """
-        try:
-            if token and url.startswith(('https://', 'http://')):
-                # Insert token into URL: https://TOKEN@github.com/owner/repo
-                parts = url.split('://')
-                if len(parts) == 2:
-                    return f'{parts[0]}://{token}@{parts[1]}'
-
-            return url
-        except Exception as e:
-            self.logger.warning(f"WK-013: Error embedding token in URL: {e}")
-            return url
-
-    def _get_stored_credentials(self, url: str) -> Optional[dict]:
-        """
-        WK-013: Get stored git credentials if available.
-
-        Args:
-            url (str): Repository URL
-
-        Returns:
-            Optional[dict]: Stored credentials or None
-        """
-        try:
-            # Parse URL to get host and path
-            parsed = urllib.parse.urlparse(url)
-            host = parsed.netloc
-
-            # Try credential helper or stored credentials
-            # This is a basic implementation - in production you'd use
-            # git credential helper or secure credential storage
-            username = os.getenv(f'GIT_USERNAME_{host.replace(".", "_").upper()}')
-            password = os.getenv(f'GIT_PASSWORD_{host.replace(".", "_").upper()}')
-
-            if username and password:
-                return {
-                    'username': username,
-                    'password': password
-                }
-
-            return None
-
-        except Exception as e:
-            self.logger.warning(f"WK-013: Error getting stored credentials: {e}")
-            return None
 
     def authenticate_repo_access(self, url: str, credentials: dict = None) -> str:
         """
@@ -395,13 +255,13 @@ class RepoManager:
                 self.config = temp_config
 
                 try:
-                    auth_config = self._prepare_git_auth_config(url)
+                    auth_config = self.auth_provider.prepare_git_auth_config(url)
                     return auth_config.get('authenticated_url', url)
                 finally:
                     self.config = original_config
             else:
                 # Use existing configuration
-                auth_config = self._prepare_git_auth_config(url)
+                auth_config = self.auth_provider.prepare_git_auth_config(url)
                 return auth_config.get('authenticated_url', url)
 
         except Exception as e:
@@ -428,6 +288,35 @@ class RepoManager:
         url_hash = hashlib.md5(f"{repo_url}-{time.time()}".encode()).hexdigest()[:8]
 
         return os.path.join(self.temp_dir, f"{repo_name}-{url_hash}")
+
+    def _encode_repo_url_path(self, url: str) -> str:
+        """
+        URL encode the path component of a repository URL to handle spaces and special characters.
+        First decodes any existing URL encoding to prevent double encoding.
+
+        Args:
+            url (str): The repository URL that may contain unencoded characters in the path
+
+        Returns:
+            str: URL with the path component properly URL encoded
+        """
+        try:
+            # Parse the URL
+            parsed = urllib.parse.urlparse(url)
+
+            # First, decode any existing URL encoding in the path to prevent double-encoding
+            decoded_path = urllib.parse.unquote(parsed.path)
+
+            # URL encode the path component, preserving slashes
+            encoded_path = urllib.parse.quote(decoded_path, safe='/')
+
+            # Reconstruct the URL with the encoded path
+            encoded_url = parsed._replace(path=encoded_path).geturl()
+
+            return encoded_url
+        except Exception as e:
+            self.logger.warning(f"WK-013: Error encoding URL path: {e}")
+            return url
 
     def cleanup_temp_repos(self, keep_last_n: int = 5) -> int:
         """
@@ -608,29 +497,6 @@ class RepoManager:
             self.logger.error(f"WK-010: Error setting up git config: {e}")
             return False
 
-    def authenticate_repo_access(self, url: str, credentials: dict = None) -> str:
-        """
-        WK-010: Authenticate access to private repositories.
-
-        Stub implementation for repository authentication that will be
-        implemented with GitPython and authentication in WK-013.
-
-        Args:
-            url (str): Repository URL
-            credentials (dict): Authentication credentials
-
-        Returns:
-            str: Authenticated URL
-        """
-        try:
-            # Stub: Will be replaced with actual authentication in WK-013
-            # TODO: Implement SSH key authentication
-            # TODO: Implement personal access token authentication
-            # TODO: Implement SSH agent authentication
-            return url
-        except Exception as e:
-            self.logger.error(f"WK-010: Error authenticating repo access: {e}")
-            return url
 
     def check_repo_permissions(self, repo_path: str) -> dict:
         """

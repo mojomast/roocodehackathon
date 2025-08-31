@@ -58,6 +58,11 @@ export default function RootLayout({
                 Jobs
               </a>
             </li>
+            <li role="none">
+              <a href="/keys" className="block hover:text-blue-300 focus:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 px-3 py-2 rounded" role="menuitem">
+                API Keys
+              </a>
+            </li>
           </ul>
         </nav>
         {/* Main content area wrapped with ErrorBoundary to catch unhandled exceptions */}

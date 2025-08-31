@@ -1,5 +1,24 @@
 # Devlog
 
+## [2025-08-30] - OpenRouter Integration and Model Selection
+- **Milestone Achievement**: Integrated OpenRouter as an LLM provider and enabled model selection for documentation jobs.
+- **Backend**: Updated the `/api/jobs` endpoint to accept optional `provider` and `model_name` fields.
+- **Frontend**: Modified the "Run Job" interface to include dropdowns for provider and model selection.
+- **Documentation**: Updated `README.md` and `docs/API.md` to reflect the new features.
+
+## [2025-08-30] - API Key Management Feature
+- **Milestone Achievement**: Implemented a new feature for managing API keys.
+- **Backend**: Added a new database model for API keys and new endpoints for creating, listing, and revoking keys.
+- **Frontend**: Created a new UI for managing API keys.
+- **Documentation**: Updated `README.md` and `docs/API.md` to reflect the new feature.
+
+## [2025-08-30] - Subtask 7: Worker Logic Integration Complete
+
+- **Milestone Achievement**: Finalized the major overhaul of the worker components, concluding the integration project.
+- **AIOrchestrator**: Integrated a new, flexible LLM provider system, allowing for easier extension and maintenance.
+- **Patcher**: Enhanced the patcher with improved pull request generation logic and more robust error handling.
+- **CodeAnalyzer**: Replaced the old parser with the new `CodeAnalyzer`, which now supports extensible, AST-based parsing for both Python and JavaScript.
+
 ## [2025-08-30] - Testing Build 2: Enhanced Dev Experience and Frontend Polish
 
 - **Milestone Achievement**: Pushed "testing build 2" which includes significant improvements to the development and testing workflow, along with major frontend enhancements.

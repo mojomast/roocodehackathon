@@ -22,6 +22,7 @@ const JobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<{ message: string } | null>(null);
+  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
 
   // Debouncing for polling API calls to prevent excessive requests
   const lastPolledRef = useRef(new Map<number, number>());
@@ -29,6 +30,85 @@ const JobsPage: React.FC = () => {
 
   // Use ref to ensure only one polling interval is active at a time, preventing memory leaks from multiple intervals
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Job management handler functions
+  const handleKillJob = async (jobId: number) => {
+    const actionKey = `kill_${jobId}`;
+    if (actionLoading[actionKey]) return;
+
+    setActionLoading(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      await apiClient.killJob(jobId);
+      setJobs(prevJobs =>
+        prevJobs.map(job =>
+          job.job_id === jobId ? { ...job, status: 'canceled', updated_at: new Date().toISOString() } : job
+        )
+      );
+    } catch (err) {
+      setError({ message: `Failed to kill job ${jobId}` });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handlePauseJob = async (jobId: number) => {
+    const actionKey = `pause_${jobId}`;
+    if (actionLoading[actionKey]) return;
+
+    setActionLoading(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      await apiClient.pauseJob(jobId);
+      setJobs(prevJobs =>
+        prevJobs.map(job =>
+          job.job_id === jobId ? { ...job, status: 'paused', updated_at: new Date().toISOString() } : job
+        )
+      );
+    } catch (err) {
+      setError({ message: `Failed to pause job ${jobId}` });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleKillAllJobs = async () => {
+    const actionKey = 'kill_all';
+    if (actionLoading[actionKey]) return;
+
+    setActionLoading(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      const result = await apiClient.killAllJobs();
+      setJobs(prevJobs =>
+        prevJobs.map(job =>
+          ['pending', 'running', 'paused'].includes(job.status) ? { ...job, status: 'canceled', updated_at: new Date().toISOString() } : job
+        )
+      );
+      alert(result.message);
+    } catch (err) {
+      setError({ message: 'Failed to kill all jobs' });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handlePauseAllJobs = async () => {
+    const actionKey = 'pause_all';
+    if (actionLoading[actionKey]) return;
+
+    setActionLoading(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      const result = await apiClient.pauseAllJobs();
+      setJobs(prevJobs =>
+        prevJobs.map(job =>
+          ['pending', 'running'].includes(job.status) ? { ...job, status: 'paused', updated_at: new Date().toISOString() } : job
+        )
+      );
+      alert(result.message);
+    } catch (err) {
+      setError({ message: 'Failed to pause all jobs' });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -112,13 +192,38 @@ const JobsPage: React.FC = () => {
       case 'failed': return 'text-red-600';
       case 'in_progress': return 'text-blue-600';
       case 'pending': return 'text-yellow-600';
+      case 'canceled': return 'text-red-500';
+      case 'paused': return 'text-orange-600';
       default: return 'text-gray-600';
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">View your Documentation Jobs</h1>
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">View your Documentation Jobs</h1>
+
+      {/* Bulk Action Buttons */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+        <div className="flex gap-4">
+          <button
+            onClick={handleKillAllJobs}
+            disabled={actionLoading['kill_all']}
+            className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {actionLoading['kill_all'] && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+            Kill All Jobs
+          </button>
+          <button
+            onClick={handlePauseAllJobs}
+            disabled={actionLoading['pause_all']}
+            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {actionLoading['pause_all'] && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+            Pause All Jobs
+          </button>
+        </div>
+      </div>
+
       <div className="bg-white p-8 rounded-lg shadow-md">
         {loading && <LoadingSpinner />}
         {error && <ErrorMessage message={error.message} />}
@@ -145,6 +250,9 @@ const JobsPage: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Last Updated
                     </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -166,6 +274,32 @@ const JobsPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(job.updated_at).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex gap-2">
+                          {(job.status === 'pending' || job.status === 'running' || job.status === 'paused') && (
+                            <>
+                              <button
+                                onClick={() => handleKillJob(job.job_id)}
+                                disabled={actionLoading[`kill_${job.job_id}`]}
+                                className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              >
+                                {actionLoading[`kill_${job.job_id}`] && <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>}
+                                Kill
+                              </button>
+                              {job.status !== 'paused' && (
+                                <button
+                                  onClick={() => handlePauseJob(job.job_id)}
+                                  disabled={actionLoading[`pause_${job.job_id}`]}
+                                  className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                >
+                                  {actionLoading[`pause_${job.job_id}`] && <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>}
+                                  Pause
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

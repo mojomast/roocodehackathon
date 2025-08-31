@@ -5,3 +5,16 @@ backend/.env
 backend/.env.*
 worker/.env
 worker/.env.*
+
+# Python
+__pycache__/
+*.pyc
+
+# Databases
+*.db
+
+# Logs
+*.log
+
+# Pytest
+.pytest_cache/

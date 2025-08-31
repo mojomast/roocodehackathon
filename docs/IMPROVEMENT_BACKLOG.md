@@ -115,6 +115,26 @@ Note: `docs/BUGFIXER.md` remains the canonical bug log; this backlog complements
 
 ---
 
+## P2 - Future Enhancements (Post-Integration)
+
+19) **Extend CodeAnalyzer Language Support**
+- **Description**: The new `CodeAnalyzer` is designed for extensibility. New languages can be added by implementing new parser classes.
+- **Acceptance**:
+  - Add support for at least one new language (e.g., Java, Go, Rust).
+  - The parser correctly identifies and extracts key code constructs (functions, classes, etc.) for the new language.
+
+20) **Implement Advanced Caching for Parsed Code**
+- **Description**: To improve performance, especially for large repositories, a more sophisticated caching mechanism can be implemented. This would store the ASTs or other parsed representations of files and only re-parse them if the file content has changed.
+- **Acceptance**:
+  - A caching layer (e.g., using Redis or a file-based cache) is added to the `CodeAnalyzer`.
+  - Performance metrics show a significant reduction in processing time for subsequent runs on the same repository.
+
+21) **Enhance Prompt Management in AIOrchestrator**
+- **Description**: The prompt management system can be further enhanced to allow for easier customization and versioning of prompts. This could involve storing prompts in a database or a dedicated configuration file.
+- **Acceptance**:
+  - Prompts are externalized from the code and can be modified without requiring a code change.
+  - A system for A/B testing different prompts is in place.
+
 ## P2 — Enhancements and Cleanup
 
 15) Frontend performance and config cleanup

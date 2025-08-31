@@ -8,19 +8,21 @@ The project is fully functional with a complete microservices architecture inclu
 
 ### ✅ Implemented Features
 
-- **GitHub OAuth Authentication**: Complete OAuth2 flow for user login via GitHub
-- **Repository Documentation**: GitHub repository integration for documentation analysis and improvement
-- **Job Management**: End-to-end job processing pipeline for documentation tasks
-- **Worker Processing**: AI-powered documentation generation with Celery-based task queuing
-- **Database Integration**: PostgreSQL database with SQLAlchemy ORM for data persistence
-- **API Endpoints**: Comprehensive REST API for repository management, job processing, and authentication
-- **Security Features**: XSS prevention, authentication middleware, and input validation
-- **Testing Infrastructure**: Pytest for backend/worker, Jest for frontend with comprehensive test suites
-- **Docker Containerization**: Full containerization with Docker Compose for development and production
-
-- **Frontend**: Complete UI with React error boundaries, SEO optimization, and real-time data display
-- **Backend**: Production-ready API with GitHub OAuth, repository management, and job orchestration
-- **Worker**: Functional AI documentation pipeline with repository cloning, code analysis, and PR creation
+- **Multi-Provider LLM Support**: Integrates with both OpenAI and Anthropic models for flexible AI-powered code analysis.
+- **Advanced Code Analysis**: Utilizes an AST-based engine for in-depth analysis of Python and JavaScript code.
+- **Automated Pull Requests**: Generates detailed pull requests with comprehensive summaries of documentation changes.
+- **GitHub OAuth Authentication**: Complete OAuth2 flow for user login via GitHub.
+- **Repository Documentation**: GitHub repository integration for documentation analysis and improvement.
+- **Job Management**: End-to-end job processing pipeline for documentation tasks.
+- **Worker Processing**: AI-powered documentation generation with Celery-based task queuing.
+- **Database Integration**: PostgreSQL database with SQLAlchemy ORM for data persistence.
+- **API Endpoints**: Comprehensive REST API for repository management, job processing, and authentication.
+- **Security Features**: XSS prevention, authentication middleware, and input validation.
+- **Testing Infrastructure**: Pytest for backend/worker, Jest for frontend with comprehensive test suites.
+- **Docker Containerization**: Full containerization with Docker Compose for development and production.
+- **API Key Management**: Securely manage API keys for programmatic access.
+- **OpenRouter Support**: Integration with OpenRouter for a wider selection of LLM providers.
+- **Model Selection**: Users can select specific providers and models for documentation jobs.
 
 ## 🏛️ Architecture
 
@@ -34,6 +36,7 @@ The application is designed with a microservices architecture, containerized wit
     -   `/dashboard`: Displays an overview and job statistics.
     -   `/repos`: Allows users to connect and manage their repositories.
     -   `/jobs`: Tracks the status of documentation generation jobs.
+    -   `/keys`: Manage your API keys.
 
 ### 2. Backend (Python FastAPI)
 -   **Framework**: FastAPI with PostgreSQL (via SQLAlchemy).
@@ -54,6 +57,11 @@ The application is designed with a microservices architecture, containerized wit
     - `GET /api/jobs` - List all job statuses for user
     - `GET /api/jobs/{id}` - Get detailed job status and results
     - `GET /api/jobs/status/{id}` - Check specific job status (polling endpoint)
+    
+        **API Key Management:**
+        - `GET /api/keys` - List all API keys for the user
+        - `POST /api/keys` - Create a new API key
+        - `DELETE /api/keys/{id}` - Revoke an API key
 
     **User Management:**
     - `GET /api/user/profile` - Get current user profile information
@@ -87,9 +95,9 @@ For questions about specific documentation files, refer to their contents or che
     -   `worker.py`: Listens for and executes documentation jobs from the queue.
     -   `job_manager.py`: Manages the lifecycle of a job.
     -   `repo_manager.py`: Handles safe cloning and management of repositories.
-    -   `parser.py`: Responsible for parsing code (e.g., using Python's AST).
-    -   `ai_orchestrator.py`: Integrates with an LLM to generate documentation.
-    -   `patcher.py`: Creates commits and pull requests.
+    -   `CodeAnalyzer` (`parser.py`): A modular, AST-based parser for Python and JavaScript that provides deep code analysis.
+    -   `AIOrchestrator` (`ai_orchestrator.py`): A flexible interface supporting multiple LLM providers, including OpenAI and Anthropic, for generating high-quality documentation.
+    -   `Patcher` (`patcher.py`): An enhanced module for creating and managing GitHub pull requests with detailed, automated summaries.
     -   `logger.py`: Logs updates to `DEVLOG.md`.
 
 ## 🛠️ Getting Started

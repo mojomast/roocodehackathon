@@ -8,9 +8,11 @@ and pull requests for documentation changes.
 import logging
 import os
 import subprocess
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from datetime import datetime
 import httpx
+import time
+import random
 
 # WK-012: Import for GitHub API integration
 
@@ -42,6 +44,11 @@ class Patcher:
         self.github_api_base = self.config.get('github_api_base', 'https://api.github.com')
         self.timeout = self.config.get('api_timeout', 30)
         self.user_agent = self.config.get('user_agent', 'FixMyDocs-Worker/1.0')
+
+        # WK-012: API retry configuration
+        self.api_retries = self.config.get('api_retries', 3)
+        self.api_retry_delay = self.config.get('api_retry_delay', 2)
+        self.api_retry_backoff = self.config.get('api_retry_backoff', 2)
 
         # WK-012: Initialize httpx client for GitHub API
         self.api_client = self._create_api_client()
@@ -146,48 +153,42 @@ class Patcher:
 
     def create_pull_request(self, clone_path: str, **kwargs) -> bool:
         """
-        WK-012: Create a pull request using GitHub API with actual implementation.
-
-        Creates a pull request via GitHub REST API using httpx for proper
-        integration with GitHub's pull request system.
+        WK-012: Create a pull request using GitHub API with enhanced error handling and retry logic.
 
         Args:
-            clone_path (str): Path to the repository with changes
-            **kwargs: Additional parameters for PR creation
+            clone_path (str): Path to the repository with changes.
+            **kwargs: Additional parameters for PR creation.
 
         Returns:
-            bool: True if PR creation was successful, False otherwise
+            bool: True if PR creation was successful, False otherwise.
         """
         try:
             if not self.github_token:
-                self.logger.error("WK-012: GitHub token not configured. Set GITHUB_TOKEN environment variable.")
+                self.logger.error("GitHub token not configured. Set GITHUB_TOKEN environment variable.")
                 return False
 
-            # Extract PR parameters
-            title = kwargs.get('title', 'Auto-generated documentation updates')
-            body = kwargs.get('body', 'This PR contains automatically generated documentation updates.')
+            remote_url = self._get_remote_url(clone_path)
+            if not remote_url:
+                self.logger.error("Could not determine repository remote URL.")
+                return False
+
+            owner, repo = self._extract_repo_info(remote_url)
+            if not owner or not repo:
+                self.logger.error(f"Could not extract owner/repo from URL: {remote_url}")
+                return False
+
             head_branch = kwargs.get('head_branch', f'feature/docs-{datetime.utcnow().strftime("%Y%m%d-%H%M%S")}')
+            if not self.push_changes_to_remote(clone_path, head_branch):
+                self.logger.error(f"Failed to push changes to remote branch {head_branch}.")
+                return False
+
+            title = kwargs.get('title', 'Auto-generated documentation updates')
+            body = self._generate_pr_body(clone_path, kwargs.get('body'))
             base_branch = kwargs.get('base_branch', 'main')
             draft = kwargs.get('draft', False)
             reviewers = kwargs.get('reviewers', [])
             labels = kwargs.get('labels', ['documentation'])
 
-            # Get repository remote URL
-            remote_url = self._get_remote_url(clone_path)
-            if not remote_url:
-                self.logger.error("WK-012: Could not get repository remote URL")
-                return False
-
-            owner, repo = self._extract_repo_info(remote_url)
-            if not owner or not repo:
-                self.logger.error(f"WK-012: Could not extract owner/repo from URL: {remote_url}")
-                return False
-
-            # Push the branch to remote first
-            if not self.push_changes_to_remote(clone_path, head_branch):
-                self.logger.warning("WK-012: Failed to push changes to remote, but continuing with PR creation")
-
-            # Create the pull request
             pr_endpoint = f'/repos/{owner}/{repo}/pulls'
             pr_data = {
                 'title': title,
@@ -197,32 +198,84 @@ class Patcher:
                 'draft': draft
             }
 
-            self.logger.info(f"WK-012: Creating pull request: {title}")
-            response = self.api_client.post(pr_endpoint, json=pr_data)
+            self.logger.info(f"Creating pull request: {title}")
+            pr_info = self._send_api_request('POST', pr_endpoint, json=pr_data)
 
-            if response.status_code in [201, 200]:
-                pr_info = response.json()
+            if pr_info:
                 pr_number = pr_info.get('number')
                 pr_url = pr_info.get('html_url')
+                self.logger.info(f"Pull request created successfully: {pr_url}")
 
-                self.logger.info(f"WK-012: Pull request created successfully: {pr_url}")
-
-                # Add reviewers if specified
                 if reviewers:
                     self._add_pr_reviewers(owner, repo, pr_number, reviewers)
-
-                # Add labels if specified
                 if labels:
                     self._add_pr_labels(owner, repo, pr_number, labels)
 
                 return True
             else:
-                self.logger.error(f"WK-012: Failed to create PR: HTTP {response.status_code} - {response.text}")
+                self.logger.error("Failed to create pull request after multiple retries.")
                 return False
 
         except Exception as e:
-            self.logger.error(f"WK-012: Error creating pull request: {e}")
+            self.logger.error(f"An unexpected error occurred during pull request creation: {e}")
             return False
+
+    def _send_api_request(self, method: str, endpoint: str, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Send a request to the GitHub API with retry logic for transient errors.
+        """
+        for attempt in range(self.api_retries):
+            try:
+                response = self.api_client.request(method, endpoint, **kwargs)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                if 500 <= e.response.status_code < 600:
+                    delay = self.api_retry_delay * (self.api_retry_backoff ** attempt) + random.uniform(0, 1)
+                    self.logger.warning(f"API request failed with status {e.response.status_code}. Retrying in {delay:.2f}s...")
+                    time.sleep(delay)
+                else:
+                    self.logger.error(f"API request failed: {e.response.status_code} - {e.response.text}")
+                    return None
+            except httpx.RequestError as e:
+                self.logger.error(f"An error occurred while requesting {e.request.url!r}: {e}")
+                return None
+        return None
+
+    def _generate_pr_body(self, clone_path: str, custom_body: Optional[str] = None) -> str:
+        """
+        Generate a structured pull request body with change summary.
+        """
+        try:
+            original_cwd = os.getcwd()
+            os.chdir(clone_path)
+            
+            # Get a summary of changes
+            result = subprocess.run(
+                [self.git_command, 'diff', '--shortstat', 'HEAD~1'],
+                capture_output=True, text=True, check=True
+            )
+            change_summary = result.stdout.strip()
+
+            body = f"""
+### Automated Documentation Update
+
+This pull request was automatically generated by FixMyDocs.
+
+**Summary of Changes:**
+```
+{change_summary}
+```
+"""
+            if custom_body:
+                body += f"\n---\n\n{custom_body}"
+            
+            return body
+        except subprocess.CalledProcessError as e:
+            self.logger.warning(f"Could not generate change summary: {e}")
+            return custom_body or "This PR contains automatically generated documentation updates."
+        finally:
+            os.chdir(original_cwd)
 
     def _get_remote_url(self, clone_path: str) -> Optional[str]:
         """
@@ -320,18 +373,15 @@ class Patcher:
         try:
             endpoint = f'/repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers'
             data = {'reviewers': reviewers}
-
-            response = self.api_client.post(endpoint, json=data)
-
-            if response.status_code == 201:
-                self.logger.info(f"WK-012: Added reviewers to PR #{pr_number}")
+            
+            if self._send_api_request('POST', endpoint, json=data):
+                self.logger.info(f"Successfully added reviewers to PR #{pr_number}")
                 return True
             else:
-                self.logger.warning(f"WK-012: Failed to add reviewers to PR #{pr_number}: {response.text}")
+                self.logger.warning(f"Failed to add reviewers to PR #{pr_number}")
                 return False
-
         except Exception as e:
-            self.logger.warning(f"WK-012: Error adding PR reviewers: {e}")
+            self.logger.warning(f"An unexpected error occurred while adding reviewers: {e}")
             return False
 
     def _add_pr_labels(self, owner: str, repo: str, pr_number: int, labels: list) -> bool:
@@ -351,17 +401,14 @@ class Patcher:
             endpoint = f'/repos/{owner}/{repo}/issues/{pr_number}/labels'
             data = {'labels': labels}
 
-            response = self.api_client.post(endpoint, json=data)
-
-            if response.status_code == 200:
-                self.logger.info(f"WK-012: Added labels to PR #{pr_number}")
+            if self._send_api_request('POST', endpoint, json=data):
+                self.logger.info(f"Successfully added labels to PR #{pr_number}")
                 return True
             else:
-                self.logger.warning(f"WK-012: Failed to add labels to PR #{pr_number}: {response.text}")
+                self.logger.warning(f"Failed to add labels to PR #{pr_number}")
                 return False
-
         except Exception as e:
-            self.logger.warning(f"WK-012: Error adding PR labels: {e}")
+            self.logger.warning(f"An unexpected error occurred while adding labels: {e}")
             return False
 
     def _is_git_repository(self) -> bool:
@@ -468,32 +515,6 @@ class Patcher:
             raise RuntimeError(f"Failed to create patch file: {e}")
         except Exception as e:
             raise RuntimeError(f"Error creating patch file: {e}")
-
-    # (duplicate stub removed: canonical create_pull_request defined above)
-            return False
-
-    def push_changes_to_remote(self, clone_path: str) -> bool:
-        """
-        WK-010: Push documentation changes to remote repository.
-
-        Stub implementation for pushing changes to remote.
-
-        Args:
-            clone_path (str): Path to the repository with changes
-
-        Returns:
-            bool: True if push was successful, False otherwise
-        """
-        try:
-            self.logger.info(f"WK-010: Pushing changes for {clone_path}")
-
-            # Stub implementation - will be enhanced in WK-012
-            self.logger.info("WK-010: Push changes stub completed")
-
-            return True
-        except Exception as e:
-            self.logger.error(f"WK-010: Error pushing changes: {e}")
-            return False
 
     def validate_changes(self, clone_path: str) -> bool:
         """
